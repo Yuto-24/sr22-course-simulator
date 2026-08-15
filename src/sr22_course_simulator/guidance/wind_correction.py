@@ -24,10 +24,23 @@ def solve_heading_for_ground_track(
     true_airspeed_mps: float,
     wind: WindVector,
 ) -> WindCorrectionSolution:
-    """Solve heading and GS for a desired ground track.
-
-    Wind components are velocity *toward* ENU, even when the provider was built
-    from a meteorological FROM direction.
+    """
+    Determine the heading and ground speed required to maintain a desired ground track.
+    
+    Parameters:
+        desired_track_true_rad (float): Desired true ground track in radians.
+        true_airspeed_mps (float): True airspeed in meters per second.
+        wind (WindVector): Wind velocity toward the east and north in meters per second.
+    
+    Returns:
+        WindCorrectionSolution: The wrapped desired track, required true heading,
+            ground speed, and right-side crosswind component.
+    
+    Raises:
+        ValidationError: If the track or airspeed is not finite, or the airspeed is
+            not positive.
+        UnsupportedModelError: If the crosswind exceeds true airspeed or the
+            headwind prevents positive progress along the desired track.
     """
 
     track = float(desired_track_true_rad)

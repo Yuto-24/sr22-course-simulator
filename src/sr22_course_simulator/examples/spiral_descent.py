@@ -41,7 +41,13 @@ from sr22_course_simulator.units import degrees_to_radians, feet_to_metres, knot
 
 
 def build_assumption_model() -> QuasiSteadyAircraftModel:
-    """Build conspicuously synthetic local closure parameters for the demo."""
+    """
+    Builds the synthetic aircraft performance model used by the spiral-descent demo.
+    
+    Returns:
+        QuasiSteadyAircraftModel: An assumption-dependent model with constrained
+            pitch, bank, power, and flap ranges.
+    """
 
     domain = AssumptionDomain(
         minimum_pitch_rad=degrees_to_radians(-10.0),
@@ -70,6 +76,12 @@ def build_assumption_model() -> QuasiSteadyAircraftModel:
 
 
 def build_initial_state() -> InitialState:
+    """Create the initial aircraft state for the spiral-descent demonstration.
+    
+    Returns:
+        InitialState: A synthetic aircraft state at 4,000 feet, heading east at
+            110 knots, with the demonstration payload and initial fuel load.
+    """
     return InitialState(
         time_s=0.0,
         position=GeoPosition(34.7500, 135.4500),
@@ -85,6 +97,15 @@ def build_initial_state() -> InitialState:
 
 
 def run_forward_demo(*, wind: bool = False):
+    """
+    Run a 60-second forward spiral-descent simulation using the assumption-based aircraft model.
+    
+    Parameters:
+        wind (bool): Whether to include a 10-knot wind from 270 degrees true.
+    
+    Returns:
+        The resulting forward simulation.
+    """
     initial = build_initial_state()
     environment = Environment(
         atmosphere=Atmosphere(temperature_k=288.15, pressure_altitude_m=initial.altitude_m),
@@ -111,6 +132,15 @@ def run_forward_demo(*, wind: bool = False):
 
 
 def run_guided_demo(*, wind: bool = True):
+    """
+    Run a guided two-turn spiral-descent simulation using the assumption-based aircraft model.
+    
+    Parameters:
+    	wind (bool): Whether to include the configured 10-knot wind.
+    
+    Returns:
+    	The guided spiral-descent simulation result.
+    """
     initial = build_initial_state()
     model = build_assumption_model()
     target_tas = knots_to_metres_per_second(110.0)
@@ -158,6 +188,7 @@ def run_guided_demo(*, wind: bool = True):
 
 
 def main() -> None:
+    """Run the spiral-descent demonstration from command-line options."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("forward", "guided"), default="guided")
     parser.add_argument("--calm", action="store_true", help="use NoWind")

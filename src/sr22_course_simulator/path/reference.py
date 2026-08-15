@@ -19,6 +19,12 @@ class PathPoint:
     altitude_m: float
 
     def __post_init__(self) -> None:
+        """
+        Validate that the path point altitude is finite.
+        
+        Raises:
+            ValidationError: If the altitude is not finite.
+        """
         if not math.isfinite(float(self.altitude_m)):
             raise ValidationError("path-point altitude must be finite")
 
@@ -28,7 +34,12 @@ class ReferencePath(Protocol):
     name: str
 
     def points(self) -> tuple[PathPoint, ...]:
-        """Return immutable display/export samples of the desired geometry."""
+        """
+        Provide the generated immutable samples of the spiral path.
+        
+        Returns:
+        	tuple[PathPoint, ...]: The path samples in traversal order.
+        """
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,11 +50,18 @@ class PolylineReferencePath:
     citation: SourceCitation | None = None
 
     def __post_init__(self) -> None:
+        """
+        Normalize the path points and require at least two points.
+        
+        Raises:
+            ValidationError: If fewer than two path points are provided.
+        """
         object.__setattr__(self, "path_points", tuple(self.path_points))
         if len(self.path_points) < 2:
             raise ValidationError("a ReferencePath must contain at least two points")
 
     def points(self) -> tuple[PathPoint, ...]:
+        """Return the immutable path samples."""
         return self.path_points
 
 
@@ -76,6 +94,13 @@ class PylonSpiralPath:
     _points: tuple[PathPoint, ...] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """
+        Validate the spiral configuration and generate its immutable path points.
+        
+        Raises:
+            ValidationError: If the path name, radius, bearings, sweep, altitudes, or
+                point count is invalid.
+        """
         if not self.name.strip():
             raise ValidationError("path name must not be empty")
         if not math.isfinite(float(self.radius_m)) or self.radius_m <= 0.0:
@@ -102,12 +127,30 @@ class PylonSpiralPath:
 
     @property
     def turn_direction(self) -> int:
+        """Return the spiral's turn direction.
+        
+        Returns:
+        	int: `1` for a positive clockwise sweep, `-1` for a negative sweep.
+        """
         return 1 if self.sweep_rad > 0.0 else -1
 
     def points(self) -> tuple[PathPoint, ...]:
+        """Return the immutable path samples."""
         return self._points
 
     def project(self, position: GeoPosition) -> PathProjection:
+        """
+        Project a geographic position onto the path geometry.
+        
+        Parameters:
+            position (GeoPosition): Geographic position to evaluate relative to the path center.
+        
+        Returns:
+            PathProjection: Radial distance, radial error, center-relative bearing, and tangent true-track bearing.
+        
+        Raises:
+            ValidationError: If the position coincides with the path center.
+        """
         east, north = enu_displacement(self.center, position)
         distance = math.hypot(east, north)
         if distance == 0.0:

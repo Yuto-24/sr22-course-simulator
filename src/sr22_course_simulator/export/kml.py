@@ -13,14 +13,29 @@ ET.register_namespace("", KML_NAMESPACE)
 
 
 def _tag(name: str) -> str:
+    """Build a namespace-qualified KML element name."""
     return f"{{{KML_NAMESPACE}}}{name}"
 
 
 def _coordinate_text(coordinates: tuple[tuple[float, float, float], ...]) -> str:
+    """Format coordinate triples as newline-separated KML coordinate text."""
     return "\n".join(f"{lon:.12g},{lat:.12g},{alt:.12g}" for lon, lat, alt in coordinates)
 
 
 def _document(name: str, coordinates: tuple[tuple[float, float, float], ...]) -> str:
+    """
+    Create a KML document containing an absolute-altitude line string.
+    
+    Parameters:
+        name (str): Name assigned to the document and placemark.
+        coordinates (tuple[tuple[float, float, float], ...]): Longitude, latitude, and altitude coordinates defining the line.
+    
+    Raises:
+        ValueError: If fewer than two coordinates are provided.
+    
+    Returns:
+        str: The serialized KML document.
+    """
     if len(coordinates) < 2:
         raise ValueError("KML LineString requires at least two coordinates")
     root = ET.Element(_tag("kml"))
@@ -36,6 +51,18 @@ def _document(name: str, coordinates: tuple[tuple[float, float, float], ...]) ->
 
 
 def trajectory_to_kml(trajectory: Trajectory, *, name: str = "Trajectory") -> str:
+    """
+    Convert trajectory states to a KML document.
+    
+    Parameters:
+        name (str): Name assigned to the KML placemark.
+    
+    Returns:
+        str: KML document containing the trajectory coordinates.
+    
+    Raises:
+        ValueError: If the trajectory contains fewer than two states.
+    """
     coordinates = tuple(
         (
             state.position.longitude_deg,
@@ -48,6 +75,16 @@ def trajectory_to_kml(trajectory: Trajectory, *, name: str = "Trajectory") -> st
 
 
 def reference_path_to_kml(reference_path: ReferencePath, *, name: str | None = None) -> str:
+    """
+    Convert a reference path to a KML document containing its coordinates.
+    
+    Parameters:
+    	reference_path (ReferencePath): Reference path whose points are exported.
+    	name (str | None): Optional name for the KML placemark. Uses the reference path's name when omitted.
+    
+    Returns:
+    	str: KML document containing the reference path.
+    """
     coordinates = tuple(
         (point.position.longitude_deg, point.position.latitude_deg, point.altitude_m)
         for point in reference_path.points()
@@ -56,6 +93,16 @@ def reference_path_to_kml(reference_path: ReferencePath, *, name: str | None = N
 
 
 def write_kml(content: str, destination: str | Path) -> Path:
+    """
+    Write KML content to a file, creating its parent directories as needed.
+    
+    Parameters:
+    	content (str): KML content to write.
+    	destination (str | Path): Destination file path.
+    
+    Returns:
+    	Path: The path of the written file.
+    """
     path = Path(destination)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")

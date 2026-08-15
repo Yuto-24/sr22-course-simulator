@@ -43,6 +43,19 @@ from sr22_course_simulator.units import degrees_to_radians, knots_to_metres_per_
 
 
 def _only_quantity(items, quantity: str):
+    """
+    Find the only item with the specified quantity.
+    
+    Parameters:
+    	items: Items to search.
+    	quantity (str): Quantity that the matching item must have.
+    
+    Returns:
+    	The matching item.
+    
+    Raises:
+    	AssertionError: If exactly one matching item is not found.
+    """
     matches = [item for item in items if item.quantity == quantity]
     if len(matches) != 1:
         raise AssertionError(f"expected one {quantity!r}, found {len(matches)}")
@@ -50,6 +63,19 @@ def _only_quantity(items, quantity: str):
 
 
 def _control_for(items, controlled_quantity: str):
+    """
+    Find the single control relationship for a specified controlled quantity.
+    
+    Parameters:
+    	items: Items containing control relationships.
+    	controlled_quantity (str): Quantity whose control relationship to find.
+    
+    Returns:
+    	The matching control relationship.
+    
+    Raises:
+    	AssertionError: If exactly one matching relationship is not found.
+    """
     matches = [item for item in items if item.controlled_quantity == controlled_quantity]
     if len(matches) != 1:
         raise AssertionError(
@@ -174,6 +200,12 @@ class _ConstantAssumptionResponseModel:
     name = "synthetic test response — not SR22 performance"
 
     def resolve(self, state, flight_input, environment) -> QuasiSteadyResponse:
+        """
+        Provide a fixed synthetic quasi-steady aircraft response for testing.
+        
+        Returns:
+            QuasiSteadyResponse: A response representing 110 kt true airspeed, a −2° flight-path angle, and an assumed model result.
+        """
         return QuasiSteadyResponse(
             true_airspeed_mps=knots_to_metres_per_second(110.0),
             flight_path_angle_rad=degrees_to_radians(-2.0),
@@ -216,6 +248,14 @@ class SpiralGuidanceTests(unittest.TestCase):
         )
 
     def environment(self, wind=None) -> Environment:
+        """Create the test environment for the spiral-descent guidance scenario.
+        
+        Parameters:
+        	wind (optional): Wind model to use; defaults to no wind.
+        
+        Returns:
+        	Environment: An environment with standard atmosphere, flat terrain at zero elevation, and the specified wind model.
+        """
         return Environment(
             atmosphere=Atmosphere(temperature_k=288.15, pressure_altitude_m=1200.0),
             wind=wind or NoWind(),
@@ -229,6 +269,17 @@ class SpiralGuidanceTests(unittest.TestCase):
         heading_true_rad: float = math.pi / 2.0,
         true_airspeed_mps: float | None = None,
     ) -> InitialState:
+        """
+        Create the initial aircraft state for the spiral-descent guidance scenario.
+        
+        Parameters:
+            position (GeoPosition | None): Starting position; defaults to the first path point.
+            heading_true_rad (float): Initial true heading in radians.
+            true_airspeed_mps (float | None): Initial true airspeed in meters per second; defaults to the configured target airspeed.
+        
+        Returns:
+            InitialState: The initialized aircraft state.
+        """
         return InitialState(
             time_s=0.0,
             position=position or self.path.points()[0].position,
@@ -251,6 +302,18 @@ class SpiralGuidanceTests(unittest.TestCase):
         true_airspeed_mps: float | None = None,
         time_s: float = 10.0,
     ) -> AircraftState:
+        """
+        Create an initial aircraft state for the guidance tests.
+        
+        Parameters:
+        	position (GeoPosition | None): The aircraft position; defaults to the first path point.
+        	heading_true_rad (float): The true heading in radians.
+        	true_airspeed_mps (float | None): The true airspeed in meters per second; defaults to the configured target airspeed.
+        	time_s (float): The state time in seconds.
+        
+        Returns:
+        	AircraftState: The initialized aircraft state.
+        """
         tas = self.target_tas_mps if true_airspeed_mps is None else true_airspeed_mps
         return AircraftState(
             time_s=time_s,
@@ -272,6 +335,14 @@ class SpiralGuidanceTests(unittest.TestCase):
         )
 
     def guidance(self, config: SpiralGuidanceConfig | None = None) -> SpiralDescentGuidance:
+        """Create guidance for the spiral-descent maneuver.
+        
+        Parameters:
+        	config (SpiralGuidanceConfig | None): Optional guidance configuration. Uses the instance configuration when omitted.
+        
+        Returns:
+        	SpiralDescentGuidance: Guidance configured for the maneuver specification and path.
+        """
         return SpiralDescentGuidance(
             self.package.spec,
             self.path,
@@ -284,6 +355,12 @@ class SpiralGuidanceTests(unittest.TestCase):
         state: AircraftState,
         environment: Environment,
     ) -> FlightInput:
+        """
+        Compute the flight input for an execution-phase guidance state.
+        
+        Returns:
+            FlightInput: The guidance command at the specified simulation progress.
+        """
         return guidance.input_at(
             state,
             SimulationProgress(step=20, elapsed_s=10.0, accumulated_turn_rad=0.0),

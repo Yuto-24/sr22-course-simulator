@@ -15,6 +15,14 @@ class UnsupportedModelError(SimulatorError):
     """The requested response is outside documented model coverage."""
 
     def __init__(self, message: str, *, gap: str | None = None) -> None:
+        """
+        Initialize an unsupported-model error with a description of the coverage gap.
+        
+        Parameters:
+            message (str): Description of the unsupported model or response.
+            gap (str | None): Optional description of the specific coverage gap; defaults to
+                the error message.
+        """
         super().__init__(message)
         self.gap = gap or message
 

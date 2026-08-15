@@ -13,6 +13,15 @@ MEAN_EARTH_RADIUS_M = 6_371_008.8
 
 
 def _wrap_longitude_deg(longitude_deg: float) -> float:
+    """
+    Normalize a longitude to the range from -180 to 180 degrees, preserving positive 180 degrees.
+    
+    Parameters:
+    	longitude_deg (float): Longitude in degrees.
+    
+    Returns:
+    	float: The normalized longitude in degrees.
+    """
     wrapped = (longitude_deg + 180.0) % 360.0 - 180.0
     return 180.0 if wrapped == -180.0 and longitude_deg > 0.0 else wrapped
 
@@ -23,10 +32,21 @@ def displace_position(
     east_m: float,
     north_m: float,
 ) -> GeoPosition:
-    """Apply a local EN displacement to a geographic position.
-
-    A spherical local-tangent approximation is appropriate for the short paths
-    simulated here.  Near-pole use is rejected explicitly.
+    """
+    Apply a local east and north displacement to a geographic position.
+    
+    Parameters:
+        origin (GeoPosition): Position from which to apply the displacement.
+        east_m (float): Eastward displacement in meters.
+        north_m (float): Northward displacement in meters.
+    
+    Returns:
+        GeoPosition: The displaced position with its longitude normalized to the
+        range [-180°, 180°].
+    
+    Raises:
+        ValidationError: If either displacement is not finite.
+        UnsupportedModelError: If the displacement operation reaches a pole.
     """
 
     east = float(east_m)
@@ -44,7 +64,12 @@ def displace_position(
 
 
 def enu_displacement(origin: GeoPosition, target: GeoPosition) -> tuple[float, float]:
-    """Return local East/North displacement from ``origin`` to ``target``."""
+    """
+    Compute the local eastward and northward displacement between two positions.
+    
+    Returns:
+        tuple[float, float]: The eastward and northward displacements in meters.
+    """
 
     lat0 = math.radians(origin.latitude_deg)
     lat1 = math.radians(target.latitude_deg)
@@ -57,5 +82,14 @@ def enu_displacement(origin: GeoPosition, target: GeoPosition) -> tuple[float, f
 
 
 def distance_m(origin: GeoPosition, target: GeoPosition) -> float:
+    """Calculate the planar distance between two geographic positions.
+    
+    Parameters:
+        origin (GeoPosition): Starting geographic position.
+        target (GeoPosition): Destination geographic position.
+    
+    Returns:
+        float: Approximate distance between the positions in meters.
+    """
     east, north = enu_displacement(origin, target)
     return math.hypot(east, north)

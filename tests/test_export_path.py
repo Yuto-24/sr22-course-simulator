@@ -17,6 +17,17 @@ from sr22_course_simulator.simulation import Trajectory
 
 
 def _state(time_s: float, position: GeoPosition, altitude_m: float) -> AircraftState:
+    """
+    Create a representative aircraft state for the specified time, position, and altitude.
+    
+    Parameters:
+    	time_s (float): Elapsed time associated with the state.
+    	position (GeoPosition): Aircraft geographic position.
+    	altitude_m (float): Aircraft altitude in meters.
+    
+    Returns:
+    	AircraftState: Aircraft state populated with fixed flight parameters and time-dependent fuel, weight, and turn values.
+    """
     return AircraftState(
         time_s=time_s,
         position=position,
@@ -38,6 +49,15 @@ def _state(time_s: float, position: GeoPosition, altitude_m: float) -> AircraftS
 
 
 def _coordinates(kml: str) -> list[tuple[float, float, float]]:
+    """
+    Parse KML coordinate data into longitude, latitude, and altitude tuples.
+    
+    Parameters:
+    	kml (str): KML document content.
+    
+    Returns:
+    	list[tuple[float, float, float]]: Parsed coordinate tuples.
+    """
     root = ET.fromstring(kml)
     namespace = {"k": "http://www.opengis.net/kml/2.2"}
     text = root.findtext(".//k:coordinates", namespaces=namespace)
@@ -160,9 +180,11 @@ class _RecordingAxes:
         pass
 
     def set_ylabel(self, label: str) -> None:
+        """Set the label for the y-axis."""
         pass
 
     def set_aspect(self, aspect, *, adjustable: str) -> None:
+        """Set the plot aspect ratio and adjustment mode."""
         self.aspect = aspect
         self.adjustable = adjustable
 
@@ -179,6 +201,7 @@ class _RecordingPyplot:
         self.figure = object()
 
     def subplots(self):
+        """Return the recorded figure and axes objects."""
         return self.figure, self.axes
 
 

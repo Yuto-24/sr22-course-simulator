@@ -27,6 +27,18 @@ class PerformanceTableLoadError(ValueError):
 
 
 def _object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """
+    Build a JSON object from key-value pairs while rejecting duplicate keys.
+    
+    Parameters:
+    	pairs (list[tuple[str, Any]]): JSON object members to combine.
+    
+    Returns:
+    	dict[str, Any]: The resulting object.
+    
+    Raises:
+    	PerformanceTableLoadError: If a key appears more than once.
+    """
     result: dict[str, Any] = {}
     for key, value in pairs:
         if key in result:
@@ -36,10 +48,28 @@ def _object_without_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, An
 
 
 def _reject_nonstandard_constant(value: str) -> None:
+    """Rejects non-standard numeric constants encountered during JSON decoding.
+    
+    Parameters:
+    	value (str): The JSON constant that is not part of the standard JSON syntax.
+    
+    Raises:
+    	PerformanceTableLoadError: If the value is a non-standard JSON numeric constant.
+    """
     raise PerformanceTableLoadError(f"non-standard JSON numeric constant {value!r}")
 
 
 def _object(value: object, context: str) -> Mapping[str, object]:
+    """
+    Validate and return a JSON object mapping.
+    
+    Parameters:
+    	value (object): The decoded JSON value to validate.
+    	context (str): The location of the value in the document, used in error messages.
+    
+    Returns:
+    	Mapping[str, object]: The validated mapping with string keys.
+    """
     if not isinstance(value, Mapping):
         raise PerformanceTableLoadError(f"{context} must be a JSON object")
     if not all(isinstance(key, str) for key in value):
@@ -48,6 +78,18 @@ def _object(value: object, context: str) -> Mapping[str, object]:
 
 
 def _array(value: object, context: str) -> list[object]:
+    """Validate and return a JSON array.
+    
+    Parameters:
+        value (object): Value to validate.
+        context (str): Description of the value used in error messages.
+    
+    Returns:
+        list[object]: The validated JSON array.
+    
+    Raises:
+        PerformanceTableLoadError: If the value is not a JSON array.
+    """
     if not isinstance(value, list):
         raise PerformanceTableLoadError(f"{context} must be a JSON array")
     return value
@@ -60,6 +102,15 @@ def _keys(
     required: frozenset[str],
     optional: frozenset[str] = frozenset(),
 ) -> None:
+    """
+    Validate that a mapping contains all required keys and only permitted keys.
+    
+    Parameters:
+        value (Mapping[str, object]): Mapping to validate.
+        context (str): Description included in validation error messages.
+        required (frozenset[str]): Keys that must be present.
+        optional (frozenset[str]): Additional keys that may be present.
+    """
     actual = set(value)
     missing = sorted(required - actual)
     unknown = sorted(actual - required - optional)
@@ -75,6 +126,17 @@ def _optional_text_array(
     *,
     context: str,
 ) -> tuple[object, ...]:
+    """
+    Read an optional array field from a mapping.
+    
+    Parameters:
+    	value (Mapping[str, object]): The mapping containing the field.
+    	key (str): The field name to read.
+    	context (str): The location used to identify validation errors.
+    
+    Returns:
+    	tuple[object, ...]: The field's array values, or an empty tuple when the field is absent.
+    """
     if key not in value:
         return ()
     return tuple(_array(value[key], f"{context}.{key}"))
@@ -83,6 +145,15 @@ def _optional_text_array(
 def _performance_table_from_mapping(
     document: Mapping[str, object],
 ) -> RectilinearPerformanceTable:
+    """
+    Validate a canonical performance-table mapping and construct a performance table.
+    
+    Parameters:
+    	document (Mapping[str, object]): Decoded canonical table document.
+    
+    Returns:
+    	RectilinearPerformanceTable: The validated performance table.
+    """
     root = _object(document, "canonical table")
     _keys(
         root,
@@ -235,7 +306,18 @@ def _performance_table_from_mapping(
 def performance_table_from_mapping(
     document: Mapping[str, object],
 ) -> RectilinearPerformanceTable:
-    """Validate and construct a canonical table from decoded JSON data."""
+    """
+    Validate and construct a canonical performance table from decoded JSON data.
+    
+    Parameters:
+        document (Mapping[str, object]): Decoded JSON document describing the table.
+    
+    Returns:
+        RectilinearPerformanceTable: The validated performance table.
+    
+    Raises:
+        PerformanceTableLoadError: If the document is invalid or table construction fails.
+    """
 
     try:
         return _performance_table_from_mapping(document)
@@ -248,7 +330,18 @@ def performance_table_from_mapping(
 
 
 def load_performance_table(path: str | Path) -> RectilinearPerformanceTable:
-    """Load one canonical table from strict UTF-8 JSON."""
+    """
+    Load and validate a canonical performance table from a UTF-8 JSON file.
+    
+    Parameters:
+        path (str | Path): Path to the performance-table JSON file.
+    
+    Returns:
+        RectilinearPerformanceTable: The validated performance table.
+    
+    Raises:
+        PerformanceTableLoadError: If the JSON is malformed or the table is invalid.
+    """
 
     source_path = Path(path)
     try:

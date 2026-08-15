@@ -12,6 +12,15 @@ from sr22_course_simulator.units import metres_to_feet
 
 
 def _pyplot():
+    """
+    Load and return Matplotlib's pyplot module.
+    
+    Returns:
+        module: The imported Matplotlib pyplot module.
+    
+    Raises:
+        ImportError: If Matplotlib is unavailable.
+    """
     try:
         from matplotlib import pyplot as plt
     except ImportError as exc:  # pragma: no cover - depends on optional environment
@@ -22,7 +31,15 @@ def _pyplot():
 
 
 def _longitude_latitude_aspect(latitudes_deg: Iterable[float]) -> float | str:
-    """Return a local lon/lat display aspect, or a safe automatic fallback."""
+    """
+    Determine the display aspect ratio for longitude and latitude coordinates.
+    
+    Parameters:
+        latitudes_deg (Iterable[float]): Latitude values in degrees used to estimate the representative latitude.
+    
+    Returns:
+        float | str: The longitude-to-latitude aspect ratio, or ``"auto"`` for empty input or latitudes near the poles.
+    """
 
     latitudes = tuple(float(value) for value in latitudes_deg)
     if not latitudes:
@@ -39,7 +56,16 @@ def plot_ground_track(
     *,
     reference_path: ReferencePath | None = None,
 ) -> tuple[Any, Any]:
-    """Plot 2D longitude/latitude ground tracks with optional path overlay."""
+    """
+    Plot the trajectory's longitude and latitude, optionally overlaying a reference path.
+    
+    Parameters:
+        trajectory (Trajectory): Trajectory whose ground track is plotted.
+        reference_path (ReferencePath | None): Optional path to overlay for comparison.
+    
+    Returns:
+        tuple[Any, Any]: The Matplotlib figure and axes containing the plot.
+    """
 
     plt = _pyplot()
     figure, axes = plt.subplots()
@@ -70,6 +96,14 @@ def plot_ground_track(
 
 
 def plot_altitude_time(trajectory: Trajectory) -> tuple[Any, Any]:
+    """Plot mean sea level altitude against elapsed time since the trajectory start.
+    
+    Parameters:
+    	trajectory (Trajectory): Trajectory containing timestamps and altitudes.
+    
+    Returns:
+    	tuple[Any, Any]: The Matplotlib figure and axes containing the plot.
+    """
     plt = _pyplot()
     figure, axes = plt.subplots()
     elapsed = [time - trajectory.initial.time_s for time in trajectory.times_s]
@@ -85,6 +119,15 @@ def plot_trajectory_3d(
     *,
     reference_path: ReferencePath | None = None,
 ) -> tuple[Any, Any]:
+    """
+    Create a 3D longitude, latitude, and altitude plot for a trajectory.
+    
+    Parameters:
+    	reference_path (ReferencePath | None): Optional path to overlay on the plot.
+    
+    Returns:
+    	tuple[Any, Any]: The Matplotlib figure and 3D axes.
+    """
     plt = _pyplot()
     figure = plt.figure()
     axes = figure.add_subplot(111, projection="3d")

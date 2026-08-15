@@ -18,6 +18,11 @@ class WindVector:
     up_mps: float = 0.0
 
     def __post_init__(self) -> None:
+        """Validate that all wind components are finite numeric values.
+        
+        Raises:
+            ValidationError: If any component is boolean or not finite.
+        """
         if any(
             isinstance(value, bool) or not math.isfinite(float(value))
             for value in (self.east_mps, self.north_mps, self.up_mps)
@@ -26,6 +31,11 @@ class WindVector:
 
     @property
     def horizontal_speed_mps(self) -> float:
+        """Calculate the horizontal wind speed from the eastward and northward components.
+        
+        Returns:
+        	float: The horizontal wind speed in metres per second.
+        """
         return math.hypot(self.east_mps, self.north_mps)
 
 
@@ -37,7 +47,16 @@ class WindProvider(Protocol):
         altitude_m: float,
         time_s: float,
     ) -> WindVector:
-        """Return the wind velocity toward East/North/Up at a state point."""
+        """
+        Provide the wind velocity at a position, altitude, and time.
+        
+        Parameters:
+            altitude_m (float): Altitude in metres.
+            time_s (float): Time in seconds.
+        
+        Returns:
+            WindVector: Wind velocity components toward the East, North, and Up directions.
+        """
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +67,12 @@ class NoWind:
         altitude_m: float,
         time_s: float,
     ) -> WindVector:
+        """
+        Provide zero wind at any position, altitude, or time.
+        
+        Returns:
+            WindVector: A zero-velocity wind vector.
+        """
         return WindVector(0.0, 0.0, 0.0)
 
 
@@ -63,7 +88,17 @@ class ConstantWind:
         speed_mps: float,
         vertical_mps: float = 0.0,
     ) -> "ConstantWind":
-        """Construct constant wind from meteorological FROM direction."""
+        """
+        Construct constant wind from a meteorological direction and speed.
+        
+        Parameters:
+            from_direction_deg_true (float): Direction the wind comes from, measured clockwise from true north in degrees.
+            speed_mps (float): Horizontal wind speed in meters per second.
+            vertical_mps (float): Upward wind speed in meters per second.
+        
+        Returns:
+            ConstantWind: A constant wind provider with the specified velocity.
+        """
 
         speed = float(speed_mps)
         direction = float(from_direction_deg_true)
@@ -87,6 +122,16 @@ class ConstantWind:
         from_direction_deg_true: float,
         speed_kt: float,
     ) -> "ConstantWind":
+        """
+        Create a constant wind from a meteorological direction and speed in knots.
+        
+        Parameters:
+            from_direction_deg_true (float): Direction the wind comes from, in true degrees.
+            speed_kt (float): Wind speed in knots.
+        
+        Returns:
+            ConstantWind: A constant wind with zero vertical velocity.
+        """
         return cls.from_meteorological(
             from_direction_deg_true=from_direction_deg_true,
             speed_mps=knots_to_metres_per_second(speed_kt),
@@ -98,4 +143,10 @@ class ConstantWind:
         altitude_m: float,
         time_s: float,
     ) -> WindVector:
+        """
+        Provide the configured wind vector at any position, altitude, and time.
+        
+        Returns:
+        	WindVector: The constant wind vector.
+        """
         return self.vector

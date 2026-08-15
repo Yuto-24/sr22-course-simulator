@@ -74,6 +74,19 @@ class CruiseConfiguration(StrEnum):
 
 
 def _finite_number(value: object, name: str) -> float:
+    """
+    Convert a numeric value to a finite floating-point number.
+    
+    Parameters:
+    	value (object): Value to validate and convert.
+    	name (str): Name used in the validation error message.
+    
+    Returns:
+    	float: The validated finite numeric value.
+    
+    Raises:
+    	ValueError: If the value is Boolean, non-numeric, or not finite.
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} must be a finite real number")
     result = float(value)
@@ -101,6 +114,7 @@ def _citation_compatibility_key(citation: SourceCitation) -> tuple[object, ...]:
 def _applicability_fields(
     applicability: Applicability,
 ) -> dict[str, ApplicabilityField]:
+    """Map applicability configuration fields by name."""
     return {item.name: item for item in applicability.configuration}
 
 
@@ -143,6 +157,12 @@ class ManifoldPressureSolution:
 
     @property
     def citation(self) -> SourceCitation:
+        """
+        Provide the source citation associated with the power table.
+        
+        Returns:
+        	SourceCitation: The citation for the lower-power table.
+        """
         return self.lower_power.citation
 
     @property
@@ -165,6 +185,13 @@ class SourcedKtasCorrection:
     )
 
     def __post_init__(self) -> None:
+        """
+        Validate the sourced KTAS correction and its applicability metadata.
+        
+        Raises:
+            ValueError: If the correction value, configurations, citation, or source note
+                does not match the verified nose-wheel-fairing correction.
+        """
         delta = _finite_number(self.delta_ktas, "delta_ktas")
         if delta != _NOSE_WHEEL_CORRECTION_KTAS:
             raise ValueError("the bundled source correction must be exactly -10 KTAS")
@@ -208,16 +235,28 @@ class CruiseTrueAirspeed:
 
     @property
     def canonical_ktas(self) -> float:
+        """Return the canonical POH true airspeed in knots."""
         return self.canonical.value
 
     @property
     def effective_ktas(self) -> float:
+        """
+        Return the true airspeed after applying the configured correction.
+        
+        Returns:
+        	float: The effective true airspeed in knots.
+        """
         if self.correction is None:
             return self.canonical.value
         return self.canonical.value + self.correction.delta_ktas
 
     @property
     def is_corrected(self) -> bool:
+        """Determine whether a KTAS correction is applied.
+        
+        Returns:
+        	bool: `true` if a correction is present, `false` otherwise.
+        """
         return self.correction is not None
 
 
@@ -276,14 +315,17 @@ class CruisePerformanceResult:
 
     @property
     def manifold_pressure_inhg(self) -> float:
+        """Return the solved manifold pressure in inches of mercury."""
         return self.manifold_pressure.value_inhg
 
     @property
     def canonical_ktas(self) -> float:
+        """Return the canonical POH true airspeed in knots."""
         return self.true_airspeed.canonical_ktas
 
     @property
     def effective_ktas(self) -> float:
+        """Return the effective true airspeed in knots."""
         return self.true_airspeed.effective_ktas
 
     @property
@@ -366,6 +408,7 @@ class PohCruiseQuery:
             )
 
     def _validate_applicability(self) -> None:
+        """Validate that the performance tables share the supported aircraft configuration and compatible applicability metadata."""
         tables = (self.power_table, self.ktas_table, self.fuel_flow_table)
         aircraft_models = {table.applicability.aircraft_model for table in tables}
         if len(aircraft_models) != 1:
@@ -415,6 +458,7 @@ class PohCruiseQuery:
             )
 
     def _validate_monotonic_power(self) -> None:
+        """Validate that percent power increases strictly with manifold pressure at every ISA-deviation node."""
         map_count, isa_count = self.power_table.shape
         for isa_index in range(isa_count):
             powers = tuple(
@@ -433,6 +477,19 @@ class PohCruiseQuery:
         power_percent: float,
         isa_deviation_deg_c: float,
     ) -> ManifoldPressureSolution:
+        """Solve for manifold pressure at the requested power and ISA deviation.
+        
+        Parameters:
+        	power_percent (float): Requested engine power as a percentage.
+        	isa_deviation_deg_c (float): ISA temperature deviation in degrees Celsius.
+        
+        Returns:
+        	ManifoldPressureSolution: The manifold pressure solution and its source power evidence.
+        
+        Raises:
+        	OutOfDomainError: If the requested power is outside the available power range.
+        	RuntimeError: If the validated power curve cannot bracket the requested power.
+        """
         map_axis, _ = self.power_table.axes
         curve = tuple(
             multilinear_interpolate(
@@ -499,6 +556,17 @@ class PohCruiseQuery:
         isa_deviation_deg_c: float,
         configuration: CruiseConfiguration,
     ) -> CruisePerformanceResult:
+        """
+        Query cruise performance for a configuration at a requested power and ISA deviation.
+        
+        Parameters:
+            power_percent (float): Requested engine power percentage.
+            isa_deviation_deg_c (float): ISA temperature deviation in degrees Celsius.
+            configuration (CruiseConfiguration): Aircraft configuration for the result.
+        
+        Returns:
+            CruisePerformanceResult: Interpolated power, manifold pressure, true airspeed, and fuel flow, with the applicable configuration correction.
+        """
         power = _finite_number(power_percent, "power_percent")
         isa_deviation = _finite_number(
             isa_deviation_deg_c, "isa_deviation_deg_c"
@@ -564,7 +632,16 @@ class PohCruiseQuery:
         power_percent: float,
         isa_deviation_deg_c: float,
     ) -> CruisePerformanceResult:
-        """Query the project target with the sourced -10 KTAS correction."""
+        """
+        Query cruise performance for the target configuration with the sourced nose-wheel-pant-removed correction.
+        
+        Parameters:
+        	power_percent (float): Requested engine power percentage.
+        	isa_deviation_deg_c (float): ISA temperature deviation in degrees Celsius.
+        
+        Returns:
+        	CruisePerformanceResult: Performance values including the corrected true airspeed.
+        """
 
         return self._query(
             power_percent=power_percent,

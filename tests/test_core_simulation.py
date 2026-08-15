@@ -67,6 +67,15 @@ class CoreSimulationTestCase(unittest.TestCase):
     POWER_FRACTION = 0.5
 
     def make_environment(self, wind=None) -> Environment:
+        """
+        Create a standard sea-level simulation environment with the specified wind model.
+        
+        Parameters:
+        	wind: Optional wind model; uses calm conditions when omitted.
+        
+        Returns:
+        	Environment: An environment with standard sea-level atmospheric conditions and the selected wind model.
+        """
         return Environment(
             atmosphere=Atmosphere(temperature_k=288.15, pressure_altitude_m=0.0),
             wind=NoWind() if wind is None else wind,
@@ -81,6 +90,19 @@ class CoreSimulationTestCase(unittest.TestCase):
         time_s: float = 0.0,
         tas_mps: float = TAS_MPS,
     ) -> InitialState:
+        """
+        Create an initial aircraft state with configurable flight conditions and loading.
+        
+        Parameters:
+        	altitude_m (float): Initial altitude in metres.
+        	heading_rad (float): Initial true heading in radians.
+        	fuel_mass_kg (float): Initial fuel mass in kilograms.
+        	time_s (float): Initial simulation time in seconds.
+        	tas_mps (float): Initial true airspeed in metres per second.
+        
+        Returns:
+        	InitialState: The initialized aircraft state.
+        """
         return InitialState(
             time_s=time_s,
             position=self.ORIGIN,
@@ -103,6 +125,19 @@ class CoreSimulationTestCase(unittest.TestCase):
         maximum_bank_rad: float = math.radians(70.0),
         tas_per_power_fraction_mps: float = 0.0,
     ) -> QuasiSteadyAircraftModel:
+        """
+        Create an assumed steady-point aircraft model for deterministic tests.
+        
+        Parameters:
+            tas_mps (float): Reference true airspeed.
+            fuel_flow_kg_s (float): Fuel flow at zero power.
+            reference_angle_of_attack_rad (float): Angle of attack used by the longitudinal closure.
+            maximum_bank_rad (float): Maximum absolute bank angle supported by the model.
+            tas_per_power_fraction_mps (float): True-airspeed change per unit power fraction.
+        
+        Returns:
+            QuasiSteadyAircraftModel: A test-only aircraft model with fixed flap support and bounded pitch, bank, and power assumptions.
+        """
         domain = AssumptionDomain(
             minimum_pitch_rad=math.radians(-30.0),
             maximum_pitch_rad=math.radians(30.0),
@@ -131,6 +166,16 @@ class CoreSimulationTestCase(unittest.TestCase):
         )
 
     def make_input(self, *, pitch_rad: float = 0.0, bank_rad: float = 0.0) -> FlightInput:
+        """
+        Create flight inputs with the specified pitch and bank angles.
+        
+        Parameters:
+            pitch_rad (float): Pitch angle in radians.
+            bank_rad (float): Bank angle in radians.
+        
+        Returns:
+            FlightInput: Flight inputs using the fixture's power fraction and retracted flaps.
+        """
         return FlightInput(
             pitch_rad=pitch_rad,
             bank_rad=bank_rad,
@@ -149,6 +194,21 @@ class CoreSimulationTestCase(unittest.TestCase):
         dt_s: float = 0.25,
         max_steps: int = 10_000,
     ):
+        """
+        Run a forward simulation using the supplied or default test fixtures.
+        
+        Parameters:
+        	termination: Condition that ends the simulation.
+        	flight_input (FlightInput | None): Flight inputs to use; defaults to the shared fixture inputs.
+        	initial (InitialState | None): Initial aircraft state; defaults to the shared fixture state.
+        	environment (Environment | None): Simulation environment; defaults to the shared fixture environment.
+        	aircraft_model: Aircraft model to simulate; defaults to the shared fixture model.
+        	dt_s (float): Simulation time step in seconds.
+        	max_steps (int): Maximum number of simulation steps.
+        
+        Returns:
+        	The resulting forward simulation trajectory.
+        """
         return simulate_forward(
             initial=self.make_initial() if initial is None else initial,
             environment=self.make_environment() if environment is None else environment,
@@ -298,9 +358,25 @@ class ForwardPropagationTests(CoreSimulationTestCase):
 
         class StepInputSource:
             def initial_input(self, initial, environment):
+                """
+                Provides the initial input for a simulation.
+                
+                Parameters:
+                    initial: Initial aircraft state.
+                    environment: Simulation environment.
+                
+                Returns:
+                    The initial simulation input.
+                """
                 return initial_input
 
             def input_at(self, state, progress, environment):
+                """
+                Provide the flight input used at the requested simulation point.
+                
+                Returns:
+                	Flight inputs for the simulation step.
+                """
                 return cancellation_input
 
         model = self.make_model(tas_per_power_fraction_mps=40.0)

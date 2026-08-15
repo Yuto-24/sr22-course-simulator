@@ -20,11 +20,33 @@ class TableDefinitionError(ValueError):
 
 
 def _require_nonempty_text(value: object, field_name: str) -> None:
+    """Validate that a field contains nonblank text.
+    
+    Parameters:
+        value (object): Value to validate.
+        field_name (str): Name of the field used in the error message.
+    
+    Raises:
+        TableDefinitionError: If the value is not a non-empty string.
+    """
     if not isinstance(value, str) or not value.strip():
         raise TableDefinitionError(f"{field_name} must be a non-empty string")
 
 
 def _finite_float(value: object, field_name: str) -> float:
+    """
+    Convert a numeric value to a finite floating-point number.
+    
+    Parameters:
+        value (object): Value to validate and convert.
+        field_name (str): Name used in validation error messages.
+    
+    Returns:
+        float: The finite floating-point representation of `value`.
+    
+    Raises:
+        TableDefinitionError: If `value` is a boolean, is not numeric, or is not finite.
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TableDefinitionError(f"{field_name} must be a real number")
     result = float(value)
@@ -34,6 +56,19 @@ def _finite_float(value: object, field_name: str) -> float:
 
 
 def _as_tuple(value: object, field_name: str) -> tuple[object, ...]:
+    """
+    Convert a non-string sequence to an immutable tuple.
+    
+    Parameters:
+        value (object): The value to convert.
+        field_name (str): The field name used in validation errors.
+    
+    Returns:
+        tuple[object, ...]: The converted tuple.
+    
+    Raises:
+        TableDefinitionError: If the value is a string, bytes object, or not iterable.
+    """
     if isinstance(value, (str, bytes)):
         raise TableDefinitionError(f"{field_name} must be a sequence")
     try:
@@ -48,6 +83,21 @@ def _flat_index(
     *,
     owner: str,
 ) -> int:
+    """
+    Convert multidimensional integer indices into a row-major flat index.
+    
+    Parameters:
+        indices (Iterable[int]): Integer index for each dimension.
+        shape (tuple[int, ...]): Size of each dimension.
+        owner (str): Name included in validation error messages.
+    
+    Returns:
+        int: The row-major flat index.
+    
+    Raises:
+        IndexError: If the indices are not iterable integers, have the wrong
+            dimensionality, or fall outside the corresponding dimension bounds.
+    """
     try:
         index_tuple = tuple(indices)
     except TypeError as exc:
@@ -79,6 +129,13 @@ class PerformanceAxis:
     values: tuple[float, ...]
 
     def __post_init__(self) -> None:
+        """
+        Validate and normalize the axis definition after initialization.
+        
+        Raises:
+            TableDefinitionError: If the axis name or unit is blank, the values are
+                missing or invalid, or the values are not strictly increasing.
+        """
         _require_nonempty_text(self.name, "axis name")
         _require_nonempty_text(self.unit, f"unit for axis {self.name!r}")
         raw_values = _as_tuple(self.values, f"values for axis {self.name!r}")
@@ -96,10 +153,12 @@ class PerformanceAxis:
 
     @property
     def lower_bound(self) -> float:
+        """Return the smallest value on the axis."""
         return self.values[0]
 
     @property
     def upper_bound(self) -> float:
+        """Return the largest value on the axis."""
         return self.values[-1]
 
 
@@ -121,6 +180,13 @@ class RectilinearPerformanceTable:
     applicability: Applicability
 
     def __post_init__(self) -> None:
+        """
+        Validate and normalize the table definition after initialization.
+        
+        Raises:
+            TableDefinitionError: If the table metadata, axes, values, citation, or applicability
+                is invalid or inconsistent.
+        """
         _require_nonempty_text(self.table_id, "table_id")
         _require_nonempty_text(self.output_name, "output_name")
         _require_nonempty_text(self.output_unit, "output_unit")
@@ -157,6 +223,7 @@ class RectilinearPerformanceTable:
 
     @property
     def shape(self) -> tuple[int, ...]:
+        """Return the number of values along each table axis."""
         return tuple(len(axis.values) for axis in self.axes)
 
     @property
@@ -167,7 +234,12 @@ class RectilinearPerformanceTable:
 
     @property
     def coverage(self) -> Coverage:
-        """Coverage of canonical nodes, subject to the retained applicability."""
+        """
+        Describe support for canonical table nodes using the table-value evidence.
+        
+        Returns:
+            Coverage: Supported coverage backed by `POH_TABLE_VALUE` evidence.
+        """
 
         return Coverage(
             status=SupportStatus.SUPPORTED,
@@ -175,7 +247,15 @@ class RectilinearPerformanceTable:
         )
 
     def value_at(self, indices: Iterable[int]) -> float:
-        """Return a canonical value by N-dimensional integer index."""
+        """
+        Return the table value at an N-dimensional integer index.
+        
+        Parameters:
+            indices (Iterable[int]): Zero-based index for each table axis.
+        
+        Returns:
+            float: The value at the specified index.
+        """
 
         return self.values[
             _flat_index(indices, self.shape, owner=f"table {self.table_id!r}")

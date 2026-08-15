@@ -29,6 +29,11 @@ from sr22_course_simulator.provenance import GapKind, ModelGap, SourceCitation
 
 
 def _narrative_citation() -> SourceCitation:
+    """Identify the primary narrative source for the Spiral Descent maneuver specification.
+    
+    Returns:
+    	SourceCitation: Citation for the training-procedure document and section from which the maneuver narrative was transcribed.
+    """
     return SourceCitation(
         document_title="航空大学校 学生訓練実施要領 単発事業用課程",
         revision="改正19",
@@ -45,6 +50,12 @@ def _narrative_citation() -> SourceCitation:
 
 
 def _minimum_altitude_citation() -> SourceCitation:
+    """
+    Provide the source citation for the 2,000-ft AGL minimum training-height requirement.
+    
+    Returns:
+        SourceCitation: Citation for the applicable training-height requirement.
+    """
     return SourceCitation(
         document_title="航空大学校 学生訓練実施要領 単発事業用課程",
         revision="改正19",
@@ -58,6 +69,13 @@ def _minimum_altitude_citation() -> SourceCitation:
 
 
 def _advisory_citation() -> SourceCitation:
+    """
+    Provide the source citation for the Spiral Descent advisory reference data.
+    
+    Returns:
+        SourceCitation: Citation for the Spiral Descent row in section 5-12
+            of the specified training document.
+    """
     return SourceCitation(
         document_title="航空大学校 学生訓練実施要領 単発事業用課程",
         revision="改正19",
@@ -75,7 +93,15 @@ def _advisory_citation() -> SourceCitation:
 
 
 def spiral_descent_package() -> ManeuverPackage:
-    """Build the verified narrative spec and separately attach its advisory row."""
+    """
+    Build the verified Spiral Descent maneuver specification with its advisory reference data.
+    
+    Returns:
+        ManeuverPackage: A maneuver package containing entry, execution, and recovery phases, a
+        2,000-foot AGL minimum training-height constraint, 720-degree completion condition,
+        documented modeling gaps, and advisory values for airspeed, pitch, power, bank, gear,
+        and flaps.
+    """
 
     source = _narrative_citation()
     airspeed_kind_gap = ModelGap(

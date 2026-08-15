@@ -35,6 +35,16 @@ class SimulationProgress:
 @runtime_checkable
 class FlightInputSource(Protocol):
     def initial_input(self, initial: InitialState, environment: Environment) -> FlightInput:
+        """
+        Provide the flight input used to initialize the simulation.
+        
+        Parameters:
+            initial (InitialState): Initial aircraft and flight conditions.
+            environment (Environment): Environmental conditions for the simulation.
+        
+        Returns:
+            FlightInput: The initial flight input.
+        """
         ...
 
     def input_at(
@@ -43,6 +53,17 @@ class FlightInputSource(Protocol):
         progress: SimulationProgress,
         environment: Environment,
     ) -> FlightInput:
+        """
+        Provide flight inputs for the current simulation state.
+        
+        Parameters:
+            state (AircraftState): Current aircraft state.
+            progress (SimulationProgress): Current simulation progress.
+            environment (Environment): Current flight environment.
+        
+        Returns:
+            FlightInput: Flight inputs for the next simulation step.
+        """
         ...
 
 
@@ -51,6 +72,7 @@ class ConstantFlightInput:
     flight_input: FlightInput
 
     def initial_input(self, initial: InitialState, environment: Environment) -> FlightInput:
+        """Return the configured flight input for the initial simulation state."""
         return self.flight_input
 
     def input_at(self, state, progress, environment) -> FlightInput:
@@ -63,6 +85,7 @@ class SimulationConfig:
     max_steps: int
 
     def __post_init__(self) -> None:
+        """Validate the simulation timestep and maximum step count."""
         if not math.isfinite(float(self.dt_s)) or self.dt_s <= 0.0:
             raise ValidationError("dt_s must be finite and positive")
         if isinstance(self.max_steps, bool) or self.max_steps <= 0:
@@ -99,12 +122,18 @@ def _resolve_ground_track(
     *,
     previous_track_true_rad: float | None,
 ) -> float:
-    """Resolve track without assigning a direction to zero ground velocity.
-
-    Once the trajectory has established a valid track, an exact horizontal
-    velocity cancellation preserves that last track as state history.  At the
-    initial state there is no valid track to preserve, so the operating point
-    is explicitly unsupported.
+    """
+    Resolve the ground track while preserving the previous track when horizontal ground velocity is zero.
+    
+    Parameters:
+        ground_velocity (VelocityENU): Current ground velocity.
+        previous_track_true_rad (float | None): Previously established track in true radians, if available.
+    
+    Returns:
+        float: Ground track in true radians.
+    
+    Raises:
+        UnsupportedModelError: If the horizontal ground velocity is zero and no previous track exists.
     """
 
     track = ground_velocity.track_true_rad_or_none
@@ -124,6 +153,18 @@ def _state_at_initial(
     response: QuasiSteadyResponse,
     environment: Environment,
 ) -> AircraftState:
+    """
+    Create the initial aircraft state from the starting conditions, flight input, aerodynamic response, and environmental wind.
+    
+    Parameters:
+    	initial (InitialState): Initial aircraft conditions.
+    	flight_input (FlightInput): Flight controls and power setting at the initial time.
+    	response (QuasiSteadyResponse): Quasi-steady aircraft response used to derive the initial motion.
+    	environment (Environment): Environment used to determine wind at the initial position and time.
+    
+    Returns:
+    	AircraftState: The initial aircraft state with derived ground motion and zero accumulated fuel burn and turn.
+    """
     air = air_velocity_enu(
         true_airspeed_mps=response.true_airspeed_mps,
         heading_true_rad=initial.heading_true_rad,
@@ -165,6 +206,20 @@ def _advance(
     environment: Environment,
     dt_s: float,
 ) -> AircraftState:
+    """
+    Advance the aircraft state by one fixed simulation step using the resolved flight response and environment.
+    
+    Parameters:
+    	initial (InitialState): Initial conditions used to derive the updated aircraft weight.
+    	current (AircraftState): State at the beginning of the step.
+    	flight_input (FlightInput): Control and configuration inputs for the step.
+    	response (QuasiSteadyResponse): Resolved aircraft response for the step.
+    	environment (Environment): Atmospheric conditions used to determine wind.
+    	dt_s (float): Duration of the simulation step in seconds.
+    
+    Returns:
+    	AircraftState: Aircraft state at the end of the step.
+    """
     turn_rate = coordinated_turn_rate_rad_s(response.true_airspeed_mps, flight_input.bank_rad)
     heading_delta = turn_rate * dt_s
     midpoint_heading = current.heading_true_rad + 0.5 * heading_delta
@@ -211,11 +266,31 @@ def _advance(
 
 
 def _linear(a: float, b: float, fraction: float) -> float:
+    """Interpolate linearly between two scalar values.
+    
+    Parameters:
+    	a (float): The starting value.
+    	b (float): The ending value.
+    	fraction (float): The interpolation fraction.
+    
+    Returns:
+    	float: The value between `a` and `b` at the specified fraction.
+    """
     return a + (b - a) * fraction
 
 
 def interpolate_state(previous: AircraftState, current: AircraftState, fraction: float) -> AircraftState:
-    """Interpolate a threshold-crossing state without overshooting a safety stop."""
+    """
+    Interpolate an aircraft state between two consecutive simulation states.
+    
+    Parameters:
+        previous (AircraftState): State at the start of the interval.
+        current (AircraftState): State at the end of the interval.
+        fraction (float): Position within the interval, clamped to the range from 0.0 to 1.0.
+    
+    Returns:
+        AircraftState: State interpolated at the specified fraction, including merged evidence and source citations.
+    """
 
     if fraction <= 0.0:
         return previous
@@ -266,6 +341,20 @@ class ForwardSimulator:
         termination: TerminationCondition,
         config: SimulationConfig,
     ) -> SimulationResult:
+        """
+        Run a fixed-step forward simulation until a termination condition is reached or the step limit is exhausted.
+        
+        Parameters:
+        	initial (InitialState): Initial simulation conditions.
+        	environment (Environment): Atmospheric and environmental conditions used during propagation.
+        	input_source (FlightInputSource): Provider of initial and state-dependent flight inputs.
+        	aircraft_model (AircraftResponseModel): Model used to resolve aircraft responses.
+        	termination (TerminationCondition): Condition evaluated after initialization and each integration step.
+        	config (SimulationConfig): Timestep and maximum-step limits for the simulation.
+        
+        Returns:
+        	SimulationResult: The simulated trajectory, termination outcome, event information, model metadata, and notes.
+        """
         first_input = input_source.initial_input(initial, environment)
         seed = _seed_state(initial, first_input)
         first_response = aircraft_model.resolve(seed, first_input, environment)

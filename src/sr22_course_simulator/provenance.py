@@ -56,16 +56,40 @@ MetadataScalar: TypeAlias = str | int | float | bool
 
 
 def _require_nonempty_text(value: object, field_name: str) -> None:
+    """
+    Validate that a value is a non-empty string.
+    
+    Parameters:
+    	value (object): Value to validate.
+    	field_name (str): Name of the field used in the error message.
+    
+    Raises:
+    	ValueError: If the value is not a string or contains only whitespace.
+    """
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must be a non-empty string")
 
 
 def _validate_optional_text(value: object, field_name: str) -> None:
+    """Validate an optional text field when a value is provided."""
     if value is not None:
         _require_nonempty_text(value, field_name)
 
 
 def _immutable_text_tuple(value: object, field_name: str) -> tuple[str, ...]:
+    """
+    Convert a sequence of non-empty strings to an immutable tuple.
+    
+    Parameters:
+        value (object): Value expected to be a sequence of strings.
+        field_name (str): Field name used in validation error messages.
+    
+    Returns:
+        tuple[str, ...]: The validated strings as a tuple.
+    
+    Raises:
+        ValueError: If the value is text, is not a sequence, or contains a non-string or empty item.
+    """
     if isinstance(value, (str, bytes)):
         raise ValueError(f"{field_name} must be a sequence of strings, not text")
     try:
@@ -147,6 +171,13 @@ class Applicability:
     conditions: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        """
+        Validate and normalize applicability metadata after initialization.
+        
+        Raises:
+            ValueError: If the aircraft model, configuration, configuration fields, or
+                conditions are invalid.
+        """
         _require_nonempty_text(self.aircraft_model, "aircraft_model")
         if isinstance(self.configuration, (str, bytes)):
             raise ValueError("configuration must be a sequence of ApplicabilityField")
@@ -201,6 +232,9 @@ class Coverage:
     gaps: tuple[ModelGap, ...] = ()
 
     def __post_init__(self) -> None:
+        """
+        Validate coverage metadata and normalize evidence and model gaps to tuples.
+        """
         if not isinstance(self.status, SupportStatus):
             raise ValueError("coverage status must be a SupportStatus")
         if isinstance(self.evidence, (str, bytes)):
@@ -221,7 +255,21 @@ class Coverage:
 
     @classmethod
     def combine(cls, *coverages: Coverage) -> Coverage:
-        """Combine dependencies using the most conservative support status."""
+        """
+        Combine coverage records into a single conservative coverage result.
+        
+        Parameters:
+            *coverages (Coverage): Coverage records to combine.
+        
+        Returns:
+            Coverage: A new record with the most conservative support status and
+                duplicate evidence and model gaps removed while preserving first-seen
+                order.
+        
+        Raises:
+            ValueError: If no coverage records are provided or any item is not a
+                Coverage instance.
+        """
 
         if not coverages:
             raise ValueError("at least one Coverage is required")

@@ -54,6 +54,17 @@ class FlightInput:
         power_pct: float,
         flap: FlapSetting = FlapSetting.RETRACTED,
     ) -> "FlightInput":
+        """Construct flight inputs from angles in degrees and power as a percentage.
+        
+        Parameters:
+        	pitch_deg (float): Pitch angle in degrees.
+        	bank_deg (float): Bank angle in degrees.
+        	power_pct (float): Power as a percentage from 0 to 100.
+        	flap (FlapSetting): Flap selection.
+        
+        Returns:
+        	FlightInput: Flight inputs with angles in radians and power as a fraction.
+        """
         return cls(
             pitch_rad=degrees_to_radians(pitch_deg),
             bank_rad=degrees_to_radians(bank_deg),
@@ -63,12 +74,27 @@ class FlightInput:
 
     @property
     def pitch_deg(self) -> float:
+        """Convert the pitch angle from radians to degrees.
+        
+        Returns:
+        	float: The pitch angle in degrees.
+        """
         return radians_to_degrees(self.pitch_rad)
 
     @property
     def bank_deg(self) -> float:
+        """Provide the bank angle in degrees.
+        
+        Returns:
+            float: The bank angle in degrees.
+        """
         return radians_to_degrees(self.bank_rad)
 
     @property
     def power_pct(self) -> float:
+        """Expresses the power setting as a percentage.
+        
+        Returns:
+            float: The power setting from 0.0 to 100.0 percent.
+        """
         return self.power_fraction * 100.0

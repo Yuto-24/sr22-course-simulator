@@ -27,6 +27,13 @@ class PerformanceSnapshot:
     source_citations: tuple[SourceCitation, ...] = ()
 
     def __post_init__(self) -> None:
+        """
+        Validate and normalize the performance snapshot fields.
+        
+        Raises:
+            ValidationError: If airspeed or fuel flow is invalid, or a source citation
+                is not a `SourceCitation`.
+        """
         if not math.isfinite(self.true_airspeed_mps) or self.true_airspeed_mps <= 0.0:
             raise ValidationError("resolved true airspeed must be finite and positive")
         if not math.isfinite(self.fuel_flow_kg_s) or self.fuel_flow_kg_s < 0.0:
@@ -71,7 +78,12 @@ class SteadyPerformanceProvider(Protocol):
         flight_input: FlightInput,
         environment: Environment,
     ) -> PerformanceSnapshot:
-        """Resolve source-supported or explicitly assumed TAS and fuel flow."""
+        """
+        Resolve true airspeed and fuel flow for the requested aircraft state and operating conditions.
+        
+        Returns:
+            PerformanceSnapshot: The resolved airspeed, fuel flow, evidence, notes, and source citations.
+        """
 
 
 @runtime_checkable
@@ -83,7 +95,13 @@ class LongitudinalClosure(Protocol):
         performance: PerformanceSnapshot,
         environment: Environment,
     ) -> tuple[float, tuple[EvidenceKind, ...], tuple[str, ...]]:
-        """Close the source gap between Pitch and flight-path angle."""
+        """
+        Compute the flight-path angle from pitch and a fixed reference angle of attack.
+        
+        Returns:
+            tuple[float, tuple[EvidenceKind, ...], tuple[str, ...]]: The flight-path
+            angle in radians, supporting evidence, and explanatory notes.
+        """
 
 
 @runtime_checkable
@@ -133,6 +151,15 @@ class AssumptionDomain:
             raise ValidationError("at least one supported flap setting is required")
 
     def check(self, flight_input: FlightInput) -> None:
+        """
+        Validate that the flight input falls within the declared assumption-model domain.
+        
+        Parameters:
+        	flight_input (FlightInput): Flight condition to validate.
+        
+        Raises:
+        	UnsupportedModelError: If pitch, bank, power, or flap setting is outside the declared domain.
+        """
         if not self.minimum_pitch_rad <= flight_input.pitch_rad <= self.maximum_pitch_rad:
             raise UnsupportedModelError("Pitch is outside the declared assumption-model domain")
         if not self.minimum_bank_rad <= flight_input.bank_rad <= self.maximum_bank_rad:
@@ -164,6 +191,12 @@ class AssumedSteadyPointProvider:
     fuel_flow_per_power_fraction_kg_s: float
 
     def __post_init__(self) -> None:
+        """
+        Validate the assumed steady-performance configuration.
+        
+        Raises:
+            ValidationError: If a parameter is non-finite, the reference airspeed is not positive, the reference power fraction is outside [0, 1], or a fuel-flow parameter is negative.
+        """
         for name in (
             "reference_true_airspeed_mps",
             "reference_power_fraction",
@@ -188,6 +221,15 @@ class AssumedSteadyPointProvider:
         flight_input: FlightInput,
         environment: Environment,
     ) -> PerformanceSnapshot:
+        """
+        Resolve assumed steady-performance values for the requested flight condition.
+        
+        Parameters:
+            flight_input (FlightInput): Operating pitch, bank, power, and flap settings.
+        
+        Returns:
+            PerformanceSnapshot: Assumed true airspeed, fuel flow, evidence, and notes.
+        """
         self.domain.check(flight_input)
         tas = (
             self.reference_true_airspeed_mps
@@ -221,6 +263,7 @@ class AssumedAngleOfAttackClosure:
     reference_angle_of_attack_rad: float
 
     def __post_init__(self) -> None:
+        """Validate the reference angle of attack."""
         if not math.isfinite(float(self.reference_angle_of_attack_rad)):
             raise ValidationError("reference_angle_of_attack_rad must be finite")
 
@@ -231,6 +274,17 @@ class AssumedAngleOfAttackClosure:
         performance: PerformanceSnapshot,
         environment: Environment,
     ) -> tuple[float, tuple[EvidenceKind, ...], tuple[str, ...]]:
+        """
+        Compute the flight-path angle from pitch and a fixed reference angle of attack.
+        
+        Parameters:
+            flight_input (FlightInput): Flight condition containing the pitch angle.
+            performance (PerformanceSnapshot): Performance values associated with the flight condition.
+            environment (Environment): Environmental conditions for the flight condition.
+        
+        Returns:
+            tuple[float, tuple[EvidenceKind, ...], tuple[str, ...]]: The flight-path angle in radians, evidence classifications, and provenance notes.
+        """
         return (
             flight_input.pitch_rad - self.reference_angle_of_attack_rad,
             (EvidenceKind.ASSUMED,),
@@ -250,6 +304,17 @@ class QuasiSteadyAircraftModel:
         flight_input: FlightInput,
         environment: Environment,
     ) -> QuasiSteadyResponse:
+        """
+        Combine steady performance and longitudinal closure assumptions into a quasi-steady aircraft response.
+        
+        Parameters:
+            state (AircraftState): Current aircraft state.
+            flight_input (FlightInput): Aircraft control and configuration inputs.
+            environment (Environment): Atmospheric and environmental conditions.
+        
+        Returns:
+            QuasiSteadyResponse: Response containing airspeed, flight-path angle, fuel flow, evidence, notes, and source citations.
+        """
         performance = self.performance.resolve(state, flight_input, environment)
         gamma, closure_evidence, closure_notes = self.longitudinal_closure.flight_path_angle_rad(
             state,
@@ -279,6 +344,16 @@ class SourceDataRequiredPerformanceProvider:
         flight_input: FlightInput,
         environment: Environment,
     ) -> PerformanceSnapshot:
+        """Raise an error indicating that the required source-backed performance data is unavailable.
+        
+        Parameters:
+            state (AircraftState): Current aircraft state.
+            flight_input (FlightInput): Requested flight condition.
+            environment (Environment): Atmospheric and environmental conditions.
+        
+        Raises:
+            UnsupportedModelError: Always raised with the required source data identified.
+        """
         raise UnsupportedModelError(
             "No source-backed performance table covers this request",
             gap=f"Source data required: {self.required_source}",

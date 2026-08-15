@@ -323,6 +323,15 @@ class CruiseTableCompatibilityTests(unittest.TestCase):
 
     def test_query_is_restricted_to_the_named_altitude_and_rpm_slice(self) -> None:
         def change_altitude(table):
+            """
+            Set the table's pressure-altitude applicability to 4000 feet.
+            
+            Parameters:
+            	table: A cruise-performance table whose applicability is updated.
+            
+            Returns:
+            	A copy of the table with pressure-altitude applicability set to 4000 feet.
+            """
             configuration = tuple(
                 ApplicabilityField(item.name, 4000.0, item.unit)
                 if item.name == "pressure_altitude"

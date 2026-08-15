@@ -26,6 +26,12 @@ class GeoPosition:
     longitude_deg: float
 
     def __post_init__(self) -> None:
+        """
+        Validate and normalize the geographic coordinates.
+        
+        Raises:
+            ValidationError: If latitude or longitude is non-finite or outside its valid range.
+        """
         lat = float(self.latitude_deg)
         lon = float(self.longitude_deg)
         if not math.isfinite(lat) or not -90.0 <= lat <= 90.0:
@@ -49,6 +55,14 @@ class InitialState:
     initial_fuel_mass_kg: float
 
     def __post_init__(self) -> None:
+        """
+        Validate and normalize the initial aircraft state fields.
+        
+        Raises:
+            ValidationError: If a numeric field is non-finite, the true airspeed is not
+                positive, the initial fuel mass is negative, or loading is not a
+                Loading instance.
+        """
         finite = {
             "time_s": self.time_s,
             "altitude_m": self.altitude_m,
@@ -73,6 +87,11 @@ class InitialState:
 
     @property
     def initial_weight_kg(self) -> float:
+        """Calculate the aircraft's initial gross mass from its loading and fuel mass.
+        
+        Returns:
+        	float: The initial gross mass in kilograms.
+        """
         return self.loading.gross_mass_kg(self.initial_fuel_mass_kg)
 
 
@@ -100,6 +119,13 @@ class AircraftState:
     source_citations: tuple[SourceCitation, ...] = ()
 
     def __post_init__(self) -> None:
+        """
+        Validate and normalize an aircraft state after initialization.
+        
+        Raises:
+            ValidationError: If a numeric field is invalid, a constrained value is
+                outside its allowed range, or a source citation has an invalid type.
+        """
         numeric_fields = (
             "time_s",
             "altitude_m",
@@ -140,8 +166,14 @@ class AircraftState:
 
     @property
     def heading_true_deg(self) -> float:
+        """Convert the true heading from radians to degrees."""
         return radians_to_degrees(self.heading_true_rad)
 
     @property
     def track_true_deg(self) -> float:
+        """Convert the true ground track from radians to degrees.
+        
+        Returns:
+        	float: The true ground track in degrees.
+        """
         return radians_to_degrees(self.track_true_rad)

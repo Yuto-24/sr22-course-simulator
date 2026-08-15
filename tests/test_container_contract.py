@@ -36,6 +36,7 @@ class ContainerPythonVersionContractTests(unittest.TestCase):
         self.assertGreaterEqual(default_version, (3, 11))
 
     def test_container_check_matches_requires_python_metadata(self) -> None:
+        """Verify that project metadata requires Python 3.11 or newer."""
         pyproject = (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
         self.assertIn('requires-python = ">=3.11"', pyproject)

@@ -39,6 +39,14 @@ class QueryDimensionError(InterpolationError):
         missing: tuple[str, ...],
         unexpected: tuple[object, ...],
     ) -> None:
+        """
+        Initialize an error describing missing table axes or unexpected query coordinates.
+        
+        Parameters:
+            table_id (str): Identifier of the table involved in the query.
+            missing (tuple[str, ...]): Names of required axes absent from the query.
+            unexpected (tuple[object, ...]): Query coordinates that do not correspond to table axes.
+        """
         self.table_id = table_id
         self.missing = missing
         self.unexpected = unexpected
@@ -54,6 +62,14 @@ class InvalidCoordinateError(InterpolationError):
     """Raised when a coordinate is not a finite real number."""
 
     def __init__(self, *, table_id: str, axis_name: str, value: object) -> None:
+        """
+        Describe an invalid coordinate associated with a performance table axis.
+        
+        Parameters:
+        	table_id (str): Identifier of the table containing the invalid coordinate.
+        	axis_name (str): Name of the axis associated with the coordinate.
+        	value (object): Coordinate value that is not a finite real number.
+        """
         self.table_id = table_id
         self.axis_name = axis_name
         self.value = value
@@ -78,6 +94,17 @@ class OutOfDomainError(InterpolationError):
         upper: float,
         unit: str,
     ) -> None:
+        """
+        Initialize an error describing a coordinate outside a source table's axis domain.
+        
+        Parameters:
+            table_id (str): Identifier of the source table.
+            axis_name (str): Name of the axis containing the invalid coordinate.
+            requested (float): Requested coordinate outside the supported domain.
+            lower (float): Lower bound of the supported domain.
+            upper (float): Upper bound of the supported domain.
+            unit (str): Unit of the axis coordinates.
+        """
         self.table_id = table_id
         self.axis_name = axis_name
         self.requested = requested
@@ -103,6 +130,13 @@ class OutOfDomainError(InterpolationError):
 
 
 def _require_nonempty_text(value: object, field_name: str) -> None:
+    """
+    Validate that a field value is a non-empty string.
+    
+    Parameters:
+    	value (object): Value to validate.
+    	field_name (str): Field name used in the validation error message.
+    """
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must be a non-empty string")
 
@@ -113,6 +147,17 @@ def _finite_query_coordinate(
     table_id: str,
     axis_name: str,
 ) -> float:
+    """
+    Validate and normalize a query coordinate.
+    
+    Parameters:
+        value (object): Coordinate value to validate.
+        table_id (str): Identifier of the performance table.
+        axis_name (str): Name of the axis associated with the coordinate.
+    
+    Returns:
+        float: The finite coordinate converted to a floating-point value.
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise InvalidCoordinateError(
             table_id=table_id,
@@ -143,6 +188,12 @@ class PerformanceResult:
     applicability: Applicability
 
     def __post_init__(self) -> None:
+        """
+        Validate and normalize the performance result fields after initialization.
+        
+        Raises:
+            ValueError: If a result field, query, coordinate, or provenance value is invalid.
+        """
         _require_nonempty_text(self.quantity, "quantity")
         _require_nonempty_text(self.unit, "unit")
         _require_nonempty_text(self.table_id, "table_id")
@@ -189,10 +240,21 @@ class PerformanceResult:
 
     @property
     def is_source_node(self) -> bool:
+        """Determine whether the result comes directly from a source table node.
+        
+        Returns:
+        	bool: `true` if the evidence represents a source table value, `false` otherwise.
+        """
         return self.evidence is EvidenceKind.POH_TABLE_VALUE
 
     @property
     def coverage(self) -> Coverage:
+        """
+        Describe the support coverage represented by this result.
+        
+        Returns:
+            Coverage: Supported coverage with this result's evidence.
+        """
         return Coverage(
             status=SupportStatus.SUPPORTED,
             evidence=(self.evidence,),
@@ -207,6 +269,11 @@ class _AxisBracket:
 
     @property
     def is_exact(self) -> bool:
+        """Determine whether the bracket represents an exact axis node.
+        
+        Returns:
+            bool: `True` if the lower and upper indices are equal, `False` otherwise.
+        """
         return self.lower_index == self.upper_index
 
 
@@ -216,6 +283,19 @@ def _bracket(
     axis: PerformanceAxis,
     coordinate: float,
 ) -> _AxisBracket:
+    """Determine the source-axis bracket and interpolation weight for a coordinate.
+    
+    Parameters:
+        table_id (str): Identifier of the source table used in out-of-domain errors.
+        axis (PerformanceAxis): Axis containing the coordinate values.
+        coordinate (float): Coordinate to locate within the axis domain.
+    
+    Returns:
+        _AxisBracket: Source-node indices and the weight of the upper node.
+    
+    Raises:
+        OutOfDomainError: If the coordinate lies outside the axis domain.
+    """
     if coordinate < axis.lower_bound or coordinate > axis.upper_bound:
         raise OutOfDomainError(
             table_id=table_id,
@@ -243,11 +323,15 @@ def multilinear_interpolate(
     table: RectilinearPerformanceTable,
     point: Mapping[str, float],
 ) -> PerformanceResult:
-    """Interpolate a canonical table without extrapolation.
-
-    A query at an exact Cartesian source node bypasses interpolation arithmetic
-    and returns the stored float directly.  There is intentionally no tolerance
-    based snapping and no extrapolation option.
+    """
+    Interpolate a canonical performance table at the requested coordinates without extrapolation.
+    
+    Parameters:
+        table (RectilinearPerformanceTable): Canonical table containing the performance values.
+        point (Mapping[str, float]): Mapping of axis names to query coordinates.
+    
+    Returns:
+        PerformanceResult: Interpolated or exact source-node performance result with provenance metadata.
     """
 
     if not isinstance(table, RectilinearPerformanceTable):
@@ -336,6 +420,13 @@ class DerivedPerformanceGrid:
     interpolation_method: str = "multilinear"
 
     def __post_init__(self) -> None:
+        """
+        Validate and normalize the derived performance grid fields after initialization.
+        
+        Values are converted to floats, and axes, values, evidence, and provenance metadata
+        are checked for valid types, unique axis names, matching grid dimensions, finite
+        numeric values, and permitted evidence kinds.
+        """
         _require_nonempty_text(self.source_table_id, "source_table_id")
         _require_nonempty_text(self.output_name, "output_name")
         _require_nonempty_text(self.output_unit, "output_unit")
@@ -381,9 +472,23 @@ class DerivedPerformanceGrid:
 
     @property
     def shape(self) -> tuple[int, ...]:
+        """Return the number of sampled values along each grid axis.
+        
+        Returns:
+            tuple[int, ...]: Axis lengths in grid order.
+        """
         return tuple(len(axis.values) for axis in self.axes)
 
     def value_at(self, indices: Iterable[int]) -> float:
+        """
+        Retrieve the sampled value at a multidimensional grid position.
+        
+        Parameters:
+        	indices (Iterable[int]): Zero-based index for each grid axis.
+        
+        Returns:
+        	float: The sampled value at the specified grid position.
+        """
         return self.values[
             _flat_index(
                 indices,
@@ -393,6 +498,14 @@ class DerivedPerformanceGrid:
         ]
 
     def evidence_at(self, indices: Iterable[int]) -> EvidenceKind:
+        """Return the evidence classification for a grid point.
+        
+        Parameters:
+        	indices (Iterable[int]): Axis indices identifying the grid point.
+        
+        Returns:
+        	EvidenceKind: The evidence classification associated with the grid point.
+        """
         return self.evidence[
             _flat_index(
                 indices,
@@ -402,6 +515,15 @@ class DerivedPerformanceGrid:
         ]
 
     def coverage_at(self, indices: Iterable[int]) -> Coverage:
+        """
+        Return supported coverage for the specified grid point.
+        
+        Parameters:
+            indices (Iterable[int]): Flattened grid indices identifying the point.
+        
+        Returns:
+            Coverage: Supported coverage containing the point's evidence.
+        """
         return Coverage(
             status=SupportStatus.SUPPORTED,
             evidence=(self.evidence_at(indices),),

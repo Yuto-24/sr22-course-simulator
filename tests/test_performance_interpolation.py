@@ -43,7 +43,16 @@ FIXTURE = (
 
 
 def multi_affine(x: float, y: float, z: float) -> float:
-    """Function exactly reproducible by multilinear interpolation."""
+    """Evaluate the three-dimensional multi-affine reference function.
+    
+    Parameters:
+    	x (float): First input coordinate.
+    	y (float): Second input coordinate.
+    	z (float): Third input coordinate.
+    
+    Returns:
+    	float: The function value at the specified coordinates.
+    """
 
     return (
         7.0
@@ -58,6 +67,12 @@ def multi_affine(x: float, y: float, z: float) -> float:
 
 
 def synthetic_citation() -> SourceCitation:
+    """
+    Create source-citation metadata for the synthetic test fixture.
+    
+    Returns:
+    	SourceCitation: Citation metadata identifying the synthetic test source.
+    """
     return SourceCitation(
         document_title="Synthetic test source",
         revision="1",
@@ -67,6 +82,11 @@ def synthetic_citation() -> SourceCitation:
 
 
 def synthetic_applicability() -> Applicability:
+    """Create synthetic aircraft applicability metadata for tests.
+    
+    Returns:
+        Applicability: Applicability metadata identifying the synthetic test aircraft and configuration.
+    """
     return Applicability(
         aircraft_model="synthetic-test-only",
         configuration=(ApplicabilityField("fixture", "unit-test"),),
