@@ -2,9 +2,14 @@
 
 ## 1. Scope
 
-This project models SR22 training-flight trajectories and navigation problems at the level useful for pilot training. It is not intended to reproduce full control-surface aerodynamics or a certified engineering simulator.
+This project models SR22 training-flight trajectories, maneuver guidance, airport/reference paths and NAV problems at a level useful for pilot training.
 
-The core abstraction is a performance-based aircraft model driven by pilot-relevant flight inputs:
+It is intentionally positioned between:
+
+- a purely kinematic path-drawing tool; and
+- a full 6-DoF engineering flight-dynamics simulator.
+
+The core external flight-input abstraction is:
 
 - Pitch
 - Bank
@@ -13,11 +18,13 @@ The core abstraction is a performance-based aircraft model driven by pilot-relev
 
 Heading, airspeed, vertical speed, ground track, position, altitude, fuel and weight are state or derived quantities.
 
-## 2. Two primary workflows
+Training maneuvers are **not** defined by the chapter-end `Reference Data` tables. They are defined from the training-procedure narrative and applicable general rules.
 
-### 2.1 Forward simulation
+## 2. Three primary workflows
 
-Given an initial aircraft state, environment and flight input, integrate the aircraft state forward in time.
+### 2.1 Direct-input forward simulation
+
+Given an initial aircraft state, environment and pilot-relevant flight input, propagate the aircraft state.
 
 ```text
 InitialState + Environment + FlightInput
@@ -31,15 +38,44 @@ InitialState + Environment + FlightInput
 
 Typical use cases:
 
-- Spiral Descent under a specified bank / pitch / power setting
-- Steep Turn
-- Slow Flight
-- descent / climb / level flight
-- comparison between calm wind and wind-affected ground tracks
+- "What happens if Pitch/Bank/PWR/Flap are held or changed this way?"
+- wind/no-wind comparison;
+- sensitivity analysis;
+- controlled numerical experiments.
 
-### 2.2 Path-driven guidance
+A direct-input experiment is not automatically equivalent to the official training maneuver even if its inputs resemble the chapter-end Reference Data row.
 
-Given a Reference Path and environment, determine the pilot-relevant flight input required to maintain that path.
+### 2.2 Procedure-driven maneuver guidance
+
+Given a source-derived `ManeuverSpec`, environment and aircraft model, determine the flight inputs required to satisfy the actual maneuver targets and constraints.
+
+```text
+ManeuverSpec
+     + Environment
+     + AircraftModel
+           |
+           v
+     Guidance / Control Logic
+           |
+           v
+ Pitch / Bank / PWR / Flap
+           |
+           v
+   Forward Simulation
+           |
+           v
+      Trajectory
+```
+
+Typical use cases:
+
+- Spiral Descent while respecting source-defined speed, path and bank constraints;
+- Basic Flight where source-defined control relationships determine how deviations are corrected;
+- ground-reference maneuvers where Bank changes with wind/path error.
+
+### 2.3 Reference-path guidance
+
+Given a pure geometric path and environment, calculate the flight inputs required to maintain that path.
 
 ```text
 ReferencePath + Environment + AircraftModel
@@ -54,149 +90,312 @@ ReferencePath + Environment + AircraftModel
              ForwardSimulation
 ```
 
-This workflow must distinguish between:
+This workflow is used for:
 
-- the geometric Reference Path; and
-- the trajectory produced by the aircraft model.
+- airport traffic patterns;
+- KML-defined paths;
+- NAV legs/intercepts;
+- ideal ground-reference paths.
 
-The Reference Path does not move with wind. Wind affects the heading, groundspeed and required flight inputs used to maintain it.
+The geometric `ReferencePath` does not move with wind. Wind changes the required aircraft state/input and the resulting trajectory.
 
-## 3. Principal model objects
+## 3. Principal domain objects
 
-### InitialState
+### `InitialState`
 
-At minimum:
-
-- time
-- geographic or local position
-- altitude
-- heading
-- airspeed
-- fuel quantity
-- zero-fuel / non-fuel aircraft weight data sufficient to determine total weight
-
-Weight is not an Environment property. Current aircraft weight is derived from the initial loading state and fuel burned during the simulation.
-
-### Environment
+Initial aircraft conditions and loading needed to start integration.
 
 At minimum:
 
-- wind vector
-- temperature
-- pressure / pressure altitude as required by the performance model
+- time;
+- geographic or local position;
+- altitude;
+- heading;
+- airspeed;
+- initial fuel quantity;
+- non-fuel/loading data sufficient to determine initial gross weight.
 
-Future implementations may add spatially and temporally varying wind and atmosphere data.
+Current weight is derived from loading plus current fuel. Weight is not an Environment property.
 
-### FlightInput
+Depending on future performance requirements, CG may become part of loading/state if a source-backed model actually requires it. Do not add it merely for completeness.
 
-Primary inputs:
+### `Environment`
 
-- pitch_deg
-- bank_deg
-- power_pct
-- flap
+External atmosphere and wind.
 
-Heading is not a normal FlightInput. Initial heading belongs to InitialState. A target heading, altitude, position or elapsed time may be used as a segment termination criterion.
+At minimum:
 
-### AircraftState
+- wind vector;
+- temperature;
+- pressure / pressure altitude as required by active performance data.
 
-Expected state / derived data include:
+Future implementations may add:
 
-- time
-- position
-- altitude
-- heading
-- track
-- TAS / CAS / IAS as supported by the active model
-- GS
-- vertical speed
-- pitch
-- bank
-- PWR
-- flap
-- fuel remaining
-- fuel burned
-- aircraft weight
+- position-dependent atmosphere;
+- altitude-dependent wind;
+- time-dependent wind;
+- forecast providers such as MSM.
 
-### ReferencePath
+### `FlightInput`
 
-A geometric 2D or 3D path independent of wind. Typical forms:
+Primary pilot-relevant inputs:
 
-- straight leg
-- circular arc
-- spiral / helix
-- traffic pattern
-- NAV leg sequence
+- `pitch_deg`;
+- `bank_deg`;
+- `power_pct`;
+- `flap`.
 
-### Trajectory
+Heading is not a normal `FlightInput`.
 
-Time-indexed aircraft states generated by simulation. It must remain distinct from ReferencePath.
+- Initial heading belongs to `InitialState`.
+- Target heading may be a `Goal` or `TerminationCondition`.
+- In path-following/NAV work, required heading is a derived guidance quantity/state target, not a replacement for Bank dynamics.
 
-## 4. Segment concept
+### `AircraftState`
 
-A maneuver should be composed from reusable flight segments instead of hard-coded one-off maneuver logic where practical.
+Expected time-varying state / derived quantities include:
 
-A segment consists of:
+- time;
+- position;
+- altitude;
+- heading;
+- track;
+- IAS/CAS/TAS where supported;
+- GS;
+- vertical speed / flight-path angle where supported;
+- pitch;
+- bank;
+- PWR;
+- flap;
+- fuel remaining;
+- fuel burned;
+- current aircraft weight.
 
-- FlightInput or guidance rule
-- initial condition inherited from the prior segment
-- one or more termination conditions
+### `ManeuverSpec`
 
-Possible termination conditions:
+Source-derived definition of a training maneuver.
 
-- elapsed time
-- target altitude
-- target heading
-- accumulated turn angle
-- target position
-- Reference Path intercept
-- leg endpoint
+It contains semantics, not merely numbers.
 
-## 5. Coordinate systems
+Expected fields:
+
+- source section and revision;
+- objective;
+- phases;
+- targets;
+- nominal values;
+- approximate initial settings;
+- control relationships;
+- path constraints;
+- safety limits;
+- environment-dependent adjustment rules stated by the source;
+- termination/completion conditions;
+- attached advisory Reference Data.
+
+See `docs/maneuver-specification.md`.
+
+### `AdvisoryReference`
+
+A separately stored chapter-end Reference Data row.
+
+It is **not** part of the authoritative maneuver definition and must not silently drive the aircraft model.
+
+Permitted uses:
+
+- solver initialization;
+- UI hints;
+- result comparison;
+- sanity checking;
+- source traceability.
+
+### `ReferencePath`
+
+A geometric 2D/3D path independent of wind.
+
+Typical forms:
+
+- straight leg;
+- circular arc;
+- spiral / helix;
+- traffic pattern;
+- NAV leg sequence;
+- ground-reference maneuver geometry.
+
+### `Trajectory`
+
+Time-indexed aircraft states generated by simulation. It must remain distinct from both `ReferencePath` and `ManeuverSpec`.
+
+### `Goal` / `TerminationCondition`
+
+Possible termination conditions include:
+
+- elapsed time;
+- target altitude;
+- target heading;
+- accumulated turn angle;
+- target position;
+- Reference Path intercept;
+- leg endpoint;
+- source-defined maneuver completion event;
+- source-defined safety stop condition.
+
+## 4. Performance architecture
+
+The aircraft response model is composed from several layers.
+
+```text
+Canonical POH Performance Data
+          |
+          v
+Multidimensional Interpolators
+          |
+          v
+Published Performance Queries
+          |
+          +-------------------+
+                              |
+Procedure Targets       Analytical Physics
+                              |
+          +-------------------+
+          |
+          v
+Quasi-steady Aircraft Response / Guidance
+          |
+          v
+State propagation
+```
+
+### 4.1 POH performance layer
+
+This is the principal quantitative source for published aircraft performance.
+
+Examples of possible queries, only where source data supports them:
+
+```text
+pressure altitude x OAT/ISA deviation x PWR -> TAS
+pressure altitude x OAT/ISA deviation x PWR -> fuel flow
+pressure altitude x OAT/ISA deviation x weight -> climb performance
+```
+
+The exact independent variables must come from the actual applicable table, not from an API design wish list.
+
+### 4.2 Physics layer
+
+Use source-independent analytical relationships only where they are well-defined and compatible with the intended model.
+
+Examples:
+
+- coordinated-turn turn rate/radius;
+- vector wind addition;
+- coordinate transformations;
+- state integration;
+- fuel mass and weight update.
+
+### 4.3 Procedure layer
+
+The maneuver procedure supplies what the pilot is trying to maintain and how the source says deviations should be corrected.
+
+Example:
+
+```text
+Basic Flight narrative:
+    altitude correction -> Pitch
+    speed correction    -> Power
+```
+
+This must not be replaced by fixed values from the Reference Data table.
+
+### 4.4 Model coverage
+
+Not every arbitrary `Pitch x Bank x PWR x Flap` combination is guaranteed to be resolvable from published data.
+
+The aircraft model must expose coverage/status metadata such as:
+
+- fully source-supported;
+- POH-interpolated;
+- physics-derived;
+- calibrated;
+- assumption-dependent;
+- unsupported/out-of-domain.
+
+Unsupported combinations must fail explicitly rather than returning fabricated smooth numbers.
+
+## 5. Segment architecture
+
+Maneuvers may be composed from reusable segments, but segment boundaries must follow the source semantics rather than forcing every maneuver into the same template.
+
+A segment may contain:
+
+- direct `FlightInput`; or
+- a source-derived guidance rule;
+- inherited initial state;
+- target(s);
+- control relationship(s);
+- one or more termination conditions.
+
+Examples of segment roles:
+
+- preparation;
+- entry;
+- established maneuver;
+- transition;
+- recovery / completion.
+
+A value stated only for Entry must not become a maneuver-wide constant.
+
+## 6. Coordinate systems
 
 Use SI units internally.
 
-Recommended local dynamic frame for numerical integration:
+Recommended local integration frame:
 
-- East [m]
-- North [m]
-- Up [m]
+- East [m];
+- North [m];
+- Up [m].
 
-Geographic coordinates may be used at interfaces and for KML output.
+Geographic coordinates are used at interfaces and for KML output.
 
-Angles inside numerical routines should be radians unless a function explicitly documents otherwise. Public aviation-facing interfaces may use degrees.
+Angles in numerical routines should be radians unless explicitly documented otherwise. Public aviation-facing interfaces may use degrees.
 
-Track / heading calculations must clearly state True vs Magnetic reference. Core physical simulation should prefer True reference; magnetic conversion belongs at the navigation / interface layer.
+Track / heading calculations must clearly state True vs Magnetic reference. Core physical simulation should prefer True reference; magnetic conversion belongs in navigation/interface logic.
 
-## 6. SR22 configuration assumptions
+## 7. SR22 target configuration assumptions
 
-For the current project scope:
+For current project scope:
 
-- landing gear is fixed; no Gear state is modeled;
-- the nose wheel pant / fairing is assumed removed at all times for the target training-aircraft configuration;
+- landing gear is fixed; no Gear state/input is modeled;
+- the target Aviation College configuration assumes the nose wheel pant / fairing is removed at all times;
 - ordinary maneuvers assume coordinated flight;
-- explicit rudder / sideslip dynamics are not modeled;
-- Forward Slip and other intentional sideslip maneuvers remain future scope.
+- explicit Rudder / beta dynamics are not modeled;
+- Forward Slip and intentional sideslip remain future scope.
 
-Any performance correction associated with the wheel-pant configuration must be backed by the applicable source data and represented explicitly in the performance-data layer rather than hidden in arbitrary constants.
+Some supplied training documents contain Gear-related fields/procedures. Source transcriptions may preserve those fields for provenance, but the core target-aircraft model does not gain a variable Gear state from them.
 
-## 7. Suggested package structure
+Any performance effect associated with wheel-fairing configuration must come from an applicable explicit source or declared model assumption. Do not hide a guessed correction in the performance layer.
+
+## 8. Suggested package structure
 
 ```text
 src/sr22_course_simulator/
 ├── aircraft/
 │   ├── state.py
 │   ├── input.py
-│   ├── configuration.py
+│   ├── loading.py
 │   ├── fuel.py
 │   └── model.py
 ├── environment/
 │   ├── atmosphere.py
 │   └── wind.py
+├── procedure/
+│   ├── maneuver.py
+│   ├── phase.py
+│   ├── semantics.py
+│   └── advisory_reference.py
 ├── performance/
-│   ├── training_reference.py
 │   ├── poh.py
-│   └── interpolation.py
+│   ├── interpolation.py
+│   ├── coverage.py
+│   └── provenance.py
 ├── path/
 │   ├── reference.py
 │   ├── line.py
@@ -204,6 +403,7 @@ src/sr22_course_simulator/
 │   ├── spiral.py
 │   └── traffic_pattern.py
 ├── guidance/
+│   ├── maneuver.py
 │   ├── path_following.py
 │   ├── wind_correction.py
 │   └── intercept.py
@@ -224,4 +424,17 @@ src/sr22_course_simulator/
     └── plot3d.py
 ```
 
-This is a design target, not a requirement to create empty modules before they have a use.
+Suggested data layout:
+
+```text
+data/
+├── procedure/
+│   ├── maneuver_specs/
+│   └── reference_tables/      # advisory only
+├── poh/
+│   ├── canonical/
+│   └── metadata/
+└── airports/
+```
+
+This is a design target. Do not create empty modules/directories before they have a concrete use.
