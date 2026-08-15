@@ -2,101 +2,219 @@
 
 ## 1. Validation philosophy
 
-Aviation-related numerical outputs must be traceable and testable. The simulator should separate:
+Aviation-related numerical outputs must be traceable, testable and semantically faithful to their sources.
 
-- source-table fidelity;
+The simulator should validate separate layers independently:
+
+- source transcription fidelity;
+- source semantic interpretation;
+- POH table fidelity;
 - interpolation fidelity;
-- physics-equation correctness;
+- analytical-physics correctness;
+- fuel/weight propagation;
 - maneuver-model validity;
-- path-following performance.
+- guidance/path-following performance;
+- export/visualization integrity.
 
 Do not treat visual plausibility as sufficient validation.
 
-## 2. Minimum numerical tests
+## 2. Source-semantic validation
+
+### 2.1 Maneuver narrative
+
+Every encoded `ManeuverSpec` should be checked against the applicable narrative/body section.
+
+Tests/review should verify that the implementation correctly distinguishes:
+
+- target;
+- limit;
+- nominal value;
+- approximate initial setting;
+- control relationship;
+- path constraint;
+- termination/completion condition.
+
+A value must not change semantic class merely because a numeric API is easier to implement that way.
+
+### 2.2 Reference Data separation
+
+Each encoded chapter-end Reference Data row should reproduce the source row exactly as an `AdvisoryReference`, but it must remain separate from the authoritative `ManeuverSpec`.
+
+Required regression behavior:
+
+- changing an advisory Reference Data value must not silently change a narrative-defined target or limit;
+- a Reference Data-only value must not become a controller target unless explicitly promoted by a reviewed model rule;
+- maneuver code must not be generated solely from a Reference Data row.
+
+### 2.3 Conflict handling
+
+If narrative and Reference Data appear inconsistent:
+
+- preserve both;
+- expose the discrepancy;
+- use the applicable narrative for maneuver semantics unless another governing source clearly controls that semantic role;
+- do not silently reconcile the values.
+
+## 3. Minimum numerical tests
 
 ### Straight flight
 
-- No wind, zero bank: ground track remains straight.
+- No wind, zero bank: ground track remains straight for a supported steady-state case.
 - Constant wind: ground velocity equals air-relative velocity plus wind vector.
-- Canonical wind convention test: 270/20 produces an eastward wind component.
+- Canonical wind convention: 270/20 produces an eastward wind component.
 
 ### Coordinated turn
 
-For steady level coordinated turns, verify the implemented turn-rate / turn-radius relationships against the analytical solution used by the model.
+For supported coordinated-turn cases, verify turn-rate/turn-radius relationships against the analytical model used by the simulator.
 
-For a constant-bank no-wind test, the simulated horizontal path should close to the expected circle within integration tolerance after one complete turn.
+For a constant-bank no-wind test, the horizontal path should close to the expected circle within integration tolerance after a complete turn when other model assumptions make the analytical comparison valid.
 
 ### Altitude propagation
 
-For a model segment with known constant vertical speed or flight-path angle, verify altitude against the analytical result.
+For a segment with analytically known constant vertical speed or flight-path angle, verify altitude against the analytical result.
+
+Do not use such a synthetic test to claim that arbitrary Pitch/PWR combinations are validated.
 
 ### Fuel and weight
 
-- fuel quantity must never increase absent an explicit refueling event;
-- fuel burn integrated over a constant fuel-flow test must match the analytical value;
-- aircraft weight must decrease consistently with fuel mass burned.
+- fuel quantity must not increase absent an explicit refueling event;
+- integrated fuel burn under constant fuel flow must match analytical value;
+- current aircraft weight must decrease consistently with fuel mass burned;
+- initial weight must be reproducible from initial loading/fuel inputs.
 
-## 3. Performance-table tests
+## 4. POH performance-table validation
 
-For every interpolated POH data set:
+For every canonical/interpolated POH data set:
 
-- exact table nodes reproduce the canonical source values;
-- interpolation stays within neighboring source bounds where monotonicity implies it should;
-- requests outside the source domain fail or return an explicit out-of-domain result by default;
-- units are tested;
-- derived/cached grids are reproducible from canonical data.
+- exact source-table nodes reproduce canonical values;
+- axes and units are verified;
+- table applicability metadata is retained;
+- interpolation stays within neighboring values where the local source behavior warrants that expectation;
+- requests outside source domain fail or return explicit out-of-domain status by default;
+- generated/cached grids are reproducible from canonical data;
+- cross-table interpolation is tested at source-table slices;
+- no training Reference Data is used to fabricate a missing POH dimension.
 
-## 4. Training Reference Data tests
+## 5. Model-coverage tests
 
-Each encoded training reference must be checked against the corresponding source row / phase.
+The model must be honest about unsupported operating regions.
 
-Do not silently normalize or alter source terminology if doing so would make later source verification harder.
+Tests should verify that:
 
-## 5. Reference Path tests
+- source-supported cases resolve;
+- out-of-domain POH queries reject by default;
+- unsupported `Pitch / Bank / PWR / Flap` combinations do not return fabricated outputs;
+- explicitly calibrated/assumed regions are labeled as such;
+- model-status metadata survives through simulation results where practical.
 
-Reference Path generation should be validated independently from aircraft simulation.
+## 6. Reference Path tests
+
+Reference Path generation is validated independently from aircraft simulation.
 
 Examples:
 
 - straight-line endpoints and course;
 - arc center, radius and sweep angle;
 - traffic-pattern leg continuity;
-- KML coordinates / altitude ordering.
+- ground-reference geometry;
+- KML longitude/latitude/altitude ordering.
 
-## 6. Guidance tests
+Wind must not alter the Reference Path object itself.
 
-Path-driven guidance should expose tracking error metrics, at least where applicable:
+## 7. Guidance tests
 
-- cross-track error (XTE)
-- along-track error
-- altitude error
-- heading / track difference
+Path/procedure-driven guidance should expose tracking metrics where applicable:
 
-For calm-wind reference cases, verify that the guidance solution reduces to the expected simpler geometry.
+- cross-track error (XTE);
+- along-track error;
+- altitude error;
+- heading/track difference;
+- speed error;
+- path/pylon distance error for applicable ground-reference maneuvers.
 
-## 7. Maneuver validation priority
+Guidance tests should verify source-defined control intent where feasible.
 
-Initial practical validation sequence:
+Example:
 
-1. straight flight
-2. constant-bank turn
-3. Spiral Descent in calm wind
-4. Spiral Descent with constant wind
-5. KML trajectory export
-6. traffic-pattern reference geometry
-7. wind-corrected path following
-8. NAV cut-angle / intercept calculations
+- if the applicable procedure assigns Bank to ground-path correction, a path-error correction test should affect Bank rather than silently changing the reference geometry.
 
-## 8. Comparison with real flight data
+For calm-wind reference cases, verify that the guidance solution reduces to the appropriate simpler geometry.
 
-Future calibration may use recorded SR22 flight data. When this is introduced:
+## 8. Spiral Descent validation strategy
 
-- keep raw flight data immutable;
-- distinguish calibration data from validation data;
-- record aircraft/configuration/date where relevant;
-- compare state histories, not only final endpoints;
-- avoid tuning to a single flight and calling the model validated.
+Spiral Descent should be validated in layers.
 
-## 9. Tolerances
+### Source layer
 
-Numerical tolerances must be chosen per test category and documented in the test itself. Avoid a single broad tolerance that can conceal regressions.
+Verify encoding of the applicable Chapter 5 narrative, including the semantic distinction among:
+
+- target/entry 110 kt;
+- approximate entry Power;
+- nominal Bank;
+- maximum Bank;
+- minimum training altitude;
+- pylon/wind-related path behavior.
+
+Do not validate the maneuver by checking only that output matches the chapter-end `Pitch / PWR / Bank` row.
+
+### Physics layer
+
+Validate coordinated-turn geometry and wind-vector behavior independently.
+
+### Guidance layer
+
+Verify that wind/path error produces the intended path-maintenance response and that limits are respected.
+
+### Forward-input experiment
+
+A separate test may hold `Pitch / Bank / PWR` constant and verify numerical propagation. Label this as direct-input simulation, not procedure-conformance validation.
+
+## 9. NAV tests
+
+Validate:
+
+- zero-wind `heading == desired track` where magnetic variation is not part of the test;
+- wind triangle against independent vector calculation;
+- WCA sign conventions;
+- Cut Angle geometric construction;
+- required heading for a desired wind-corrected cut ground track;
+- intercept point/time;
+- gain/loss-time formulas where implemented.
+
+True/Magnetic references must be explicit in test names/data.
+
+## 10. Comparison with real flight data
+
+Future calibration/validation may use recorded SR22 flight data.
+
+When introduced:
+
+- keep raw data immutable;
+- separate calibration and validation flights;
+- record aircraft/configuration/date/environment where relevant;
+- compare time histories, not only endpoints;
+- retain source-based canonical behavior;
+- do not tune to one flight and call the model generally validated.
+
+## 11. Validation priority
+
+Initial practical sequence:
+
+1. source-semantic extraction tests for Basic Flight and Spiral Descent;
+2. POH canonical table-node reproduction;
+3. POH multidimensional interpolation;
+4. fuel/weight propagation;
+5. wind vectors and straight-flight geometry;
+6. coordinated-turn geometry;
+7. Spiral Descent direct-input numerical experiment;
+8. Spiral Descent procedure-driven guidance;
+9. KML trajectory/reference export;
+10. traffic-pattern reference geometry;
+11. wind-corrected path following;
+12. NAV Cut Angle / intercept calculations.
+
+## 12. Tolerances
+
+Numerical tolerances must be chosen per test category and documented in the test itself.
+
+Avoid a single broad tolerance that can conceal regressions, source-transcription mistakes or model-coverage errors.
