@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "table_id": "sr22_g6.cruise.2000ft.2500rpm.power",
+  "axes": [
+    {
+      "name": "manifold_pressure_inhg",
+      "unit": "inHg",
+      "values": [23.4, 24.4, 25.4, 26.4, 27.4]
+    },
+    {
+      "name": "isa_deviation_deg_c",
+      "unit": "degC",
+      "values": [-30.0, 0.0, 30.0]
+    }
+  ],
+  "output": {
+    "name": "power",
+    "unit": "percent"
+  },
+  "values": [
+    76.0, 72.0, 68.0,
+    80.0, 76.0, 72.0,
+    84.0, 80.0, 76.0,
+    89.0, 84.0, 80.0,
+    93.0, 88.0, 84.0
+  ],
+  "citation": {
+    "document_title": "SR22 G6 型式証明飛行規程 全章",
+    "revision": "P/N 13772-006J",
+    "effective_date": "2023-08-28",
+    "chapter": "5 Performance",
+    "section": "Cruise Performance",
+    "page": "5-32 (PDF page 192)",
+    "table": "2,000 ft / 2500 RPM cruise slice",
+    "extraction_method": "Manual transcription from a visually verified PDF vector rendering",
+    "transformations": [
+      "Rows reordered from descending MAP to ascending MAP; dependent values reordered identically",
+      "Flattened row-major with ISA-deviation axis varying fastest"
+    ],
+    "notes": ["Canonical values are the printed POH nodes"]
+  },
+  "applicability": {
+    "aircraft_model": "Cirrus SR22 G6",
+    "configuration": [
+      {"name": "weight", "value": 3400.0, "unit": "lb"},
+      {"name": "pressure_altitude", "value": 2000.0, "unit": "ft"},
+      {"name": "engine_speed", "value": 2500.0, "unit": "RPM"}
+    ],
+    "conditions": [
+      "No wind",
+      "Cruising above 85 percent Power is not recommended"
+    ]
+  }
+}

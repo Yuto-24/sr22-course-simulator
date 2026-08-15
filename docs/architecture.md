@@ -438,3 +438,54 @@ data/
 ```
 
 This is a design target. Do not create empty modules/directories before they have a concrete use.
+
+## 9. Initial implementation mapping
+
+The first package implementation follows the domain-oriented layout above, but creates only modules exercised by the current Spiral Descent work:
+
+```text
+aircraft       FlightInput, loading/fuel, InitialState/AircraftState, response protocols
+environment    atmosphere, terrain and polymorphic wind providers
+performance    canonical tables, loader, interpolation, POH cruise query
+maneuver       source-semantic ManeuverSpec and separate AdvisoryReference
+path           wind-independent PylonSpiralPath / polyline geometry
+guidance       wind triangle and bounded Spiral Descent guidance
+simulation     analytical mechanics, termination, forward integrator, Trajectory
+export         KML for ReferencePath and Trajectory
+plotting       optional object-based 2D/altitude/3D views
+```
+
+There are intentionally no empty `nav`, traffic-pattern, forecast-weather, sideslip, Rudder, Gear-dynamics or 6-DoF modules.
+
+### 9.1 Forward versus guided entry points
+
+`ForwardSimulator.simulate` / `simulate_forward` accepts only:
+
+```text
+InitialState + Environment + FlightInputSource + AircraftResponseModel
+             + TerminationCondition + SimulationConfig
+```
+
+It cannot read a `ManeuverSpec` or an `AdvisoryReference`.
+
+`simulate_guided_spiral_descent` creates a `SpiralDescentGuidance` from an authoritative `ManeuverSpec` and a separate `PylonSpiralPath`, then delegates the resulting Pitch/Bank/PWR/Flap commands to the same forward integrator. Its result retains `reference_path`, `maneuver_spec`, `guidance_history` and `simulation.trajectory` as distinct typed objects.
+
+### 9.2 Current response-model boundary
+
+The response-model protocol resolves quasi-steady TAS, flight-path angle and mass fuel flow. The integrator alone applies coordinated-turn mechanics, wind addition, geographic propagation and fuel/weight bookkeeping.
+
+No bundled POH table covers the Spiral Descent response point. The executable example therefore composes:
+
+- `AssumedSteadyPointProvider`, whose local Pitch/PWR-to-TAS and PWR-to-fuel-flow parameters are all caller-supplied;
+- `AssumedAngleOfAttackClosure`, which explicitly assumes `flight_path_angle = Pitch - reference angle of attack`;
+- analytical coordinated-turn and wind-vector physics.
+
+Those assumptions are retained as `assumed` evidence in every generated state. `SourceDataRequiredPerformanceProvider` provides an explicit unsupported path when a source-backed provider is required but absent.
+
+### 9.3 Container boundary
+
+The multi-stage `Dockerfile` has a dependency-free runtime target and a separate deterministic-test target. Both run directly from the same `src` tree with `PYTHONPATH=/app/src`; this avoids an online package-install step and still packages the canonical POH JSON alongside the code. The runtime executes as a non-root user and writes optional exports only through `/output`. `compose.yaml` maps that boundary to the host `artifacts/` directory without adding source PDFs or generated products to the image.
+
+### 9.4 Coordinate and integration method
+
+The initial integrator uses fixed time steps, midpoint heading for horizontal displacement, and a short-distance spherical local-tangent geographic approximation. It linearly interpolates a threshold-crossing final state so an altitude safety boundary is not numerically overshot. Heading is wrapped only for state display; `accumulated_turn_rad` remains unwrapped for 720-degree termination.

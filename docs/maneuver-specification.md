@@ -242,3 +242,38 @@ Before implementing a new training maneuver, an agent must:
 7. add tests that verify the encoded procedure semantics.
 
 If the source does not say how a missing relationship should behave, mark the model gap explicitly instead of filling it from the Reference Data table.
+
+## 11. Encoded Spiral Descent transcription
+
+The initial implementation verified the primary 改正19 PDF and represents the maneuver as three phases.
+
+### Entry — source 5-(34), PDF page 157
+
+- wind judgement and Clearing;
+- set a Pylon and normally arrange tailwind entry;
+- lead for 110 kt at Pylon abeam (`Target`, airspeed kind retained as `UNSPECIFIED`);
+- approximately 10% Power (`InitialSetting`);
+- rough trim to maintain altitude;
+- Pylon-abeam relationship (`PathConstraint`).
+
+### Execution — source 5-(35), PDF page 158
+
+- establish 110-kt descent attitude at Pylon abeam;
+- approximately -1 degree Pitch (`InitialSetting`, not a fixed target);
+- 45 degrees Bank (`Nominal`, adjustable);
+- 55 degrees absolute Bank (`Limit`);
+- maintain 110 kt with Pitch (`ControlRelationship`);
+- adjust Bank as altitude/wind changes to correct Drift and retain the ground-target relationship / constant radius (`ControlRelationship` and `PathConstraint`);
+- complete 720 degrees (`TerminationSpec`).
+
+### Recovery — source 5-(35), PDF page 158
+
+- roll out and level at 720 degrees;
+- if AGL 2,000 ft is reached first, hold altitude and continue to the prescribed heading before rollout;
+- keep final altitude/heading, apply MAX Power smoothly, then perform Cruise Procedure and complete the call.
+
+The current guidance simulator integrates Entry and Execution and stops at the 720-degree goal or a conservative minimum-AGL safety boundary. Recovery semantics are encoded, but Recovery propagation and the source minimum-altitude contingency are explicit `not_implemented` gaps.
+
+### Advisory row — source 5-(49), PDF page 172
+
+The exact row (A/S 110, Pitch -1.0, Power 10, Bank 45, Gear DOWN, Flaps UP) is held in a separate immutable `AdvisoryReference`. `SpiralDescentGuidance` accepts only `ManeuverSpec`, making it structurally impossible for that row to become its target/controller input.

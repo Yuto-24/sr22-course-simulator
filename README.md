@@ -199,6 +199,81 @@ POH の補間から得られる性能値と、学訓本文の Target / Control R
 - [Roadmap](docs/roadmap.md)
 - [Agent Rules](AGENTS.md)
 
-## Status
+## 現在の実装
 
-現在は設計フェーズです。まず学訓本文を `ManeuverSpec` として構造化し、POH 第 5 章の性能データを多次元補間可能な形に整備します。その上で Spiral Descent の実用的な 3D simulation と Guidance、KML 出力へ進みます。
+初回の共通基盤と Spiral Descent 最小実用版を Python package として実装済みです。
+
+- SI 単位、地理座標、`InitialState` / `AircraftState` / `Trajectory`
+- `FlightInput = Pitch / Bank / PWR / Flap`（Gear / Rudder なし）
+- `NoWind` / `ConstantWind`、気象風向 FROM convention、交換可能な Wind Provider
+- mass-based loading、fuel burn、飛行中の weight propagation
+- narrative の Target / Limit / Nominal / Initial Setting / Control Relationship / Path / Phase / Termination と Advisory Reference の型分離
+- canonical POH table、strict JSON loader、N 次元 multilinear interpolation、source-domain 外拒否、provenance / applicability metadata
+- direct-input Forward Simulation と、別 API の Spiral Descent Guidance Simulation
+- wind-independent `ReferencePath` と time-indexed `Trajectory`
+- 2D Ground Track、Altitude-Time、3D plot helper（Matplotlib は optional）
+- Trajectory / Reference Path の KML 3D LineString export
+
+### Source coverage
+
+原資料を確認し、次を実装へ反映しています。
+
+- 学生訓練実施要領 改正19、Chapter 5 Spiral Descent 本文 5-(34)〜5-(35)：110 kt、Entry 約 10% PWR、Pitch による速度 Control、Bank 45° / 最大 55°、Pylon / Drift correction、720°、Recovery
+- 同 5-(1)：最低訓練高 AGL 2,000 ft
+- 同 5-(49)：Reference Data row を `AdvisoryReference` としてのみ保持
+- SR22 G6 型式証明飛行規程 P/N 13772-006J、Chapter 5 p.5-32：2,000 ft / 2500 RPM cruise slice の canonical source nodes
+
+PDF 自体は repository に含めません。
+
+重要な model gap として、確認した POH Chapter 5 には 110 kt / 約 10% PWR / Bank 45〜55° の Spiral Descent を定義する descent performance table がありません。したがって package はこの領域を source-backed SR22 performance として扱いません。実行例は caller-supplied の `AssumedSteadyPointProvider` と固定迎角 closure を使用し、すべて `assumed` として明示します。
+
+## Install / Test
+
+```bash
+python3 -m pip install -e .
+python3 -m unittest discover -s tests -v
+```
+
+Plot helper も使う場合:
+
+```bash
+python3 -m pip install -e '.[plot]'
+```
+
+## Docker
+
+実行環境は標準ライブラリだけで完結するため、Docker image は `python:3.12-slim-bookworm` を基礎にし、package source と canonical POH JSON だけを収容します。ホスト側に Python や追加 package は不要です。
+
+Guidance demo を実行し、KML を `artifacts/guided-spiral.kml` に保存します。
+
+```bash
+mkdir -p artifacts
+LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose build
+LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose run --rm simulator
+```
+
+Windows / macOS の Docker Desktop では `LOCAL_UID` / `LOCAL_GID` を省略できます。
+
+同一 Dockerfile の test target で全回帰テストを実行します。
+
+```bash
+docker compose run --rm test
+```
+
+`PYTHON_VERSION`、`LOCAL_UID`、`LOCAL_GID` は build args / Compose 環境変数として上書き可能です。Container は非 root user で動作し、PDF 原資料や Matplotlib を runtime image に含めません。
+
+## 実行例
+
+Guidance simulation（出力は assumption-dependent であり、POH-validated descent prediction ではありません）:
+
+```bash
+sr22-spiral-demo --mode guided --kml artifacts/guided-spiral.kml
+```
+
+Direct-input experiment:
+
+```bash
+sr22-spiral-demo --mode forward --calm --kml artifacts/forward-spiral.kml
+```
+
+Python API では `simulate_forward(...)` は ManeuverSpec を受け取らず、`simulate_guided_spiral_descent(...)` は narrative-derived `ManeuverSpec` と別オブジェクトの `PylonSpiralPath` を受け取ります。この分離により、固定入力実験を公式課目の再現として誤表示しません。
