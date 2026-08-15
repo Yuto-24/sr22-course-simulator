@@ -4,13 +4,14 @@
 
 The simulator is intentionally positioned between a purely kinematic drawing tool and a full 6-DoF flight-dynamics simulator.
 
-The preferred approach is a **performance-based / semi-empirical model** built from:
+The preferred approach is a **performance-based / semi-empirical, quasi-steady model** built from:
 
-- Aviation College training Reference Data;
-- SR22 Chapter 5 performance data;
-- physical relationships that are independently well-defined, such as coordinated-turn geometry, wind-vector addition and fuel/weight bookkeeping.
+- Aviation College training-procedure narrative for maneuver semantics and control intent;
+- SR22 Chapter 5 performance data as the main quantitative performance source;
+- analytical physical relationships such as coordinated-turn geometry, vector wind addition and fuel/weight propagation;
+- explicit calibration only where needed and traceable.
 
-The model should reproduce the behavior relevant to training-course analysis without pretending to infer undocumented aerodynamic derivatives.
+The end-of-chapter Aviation College `Reference Data` tables are **not** the baseline aircraft model and are **not** the authoritative maneuver definition.
 
 ## 2. Inputs and state
 
@@ -18,30 +19,80 @@ The model should reproduce the behavior relevant to training-course analysis wit
 
 The normal pilot-relevant input set is:
 
-- Pitch
-- Bank
-- PWR
-- Flap
+- Pitch;
+- Bank;
+- PWR;
+- Flap.
 
-Do not introduce yoke deflection, control-surface deflection or rudder input unless a future requirement actually needs them.
+Do not introduce yoke deflection, control-surface deflection or Rudder input unless a future requirement actually needs them.
 
 ### Heading
 
 Heading is a state quantity, not a continuous primary control input.
 
-`Initial Heading` is part of InitialState. A `Target Heading` may exist as a goal or termination condition for a maneuver segment.
+`Initial Heading` is part of `InitialState`. A `Target Heading` may exist as a goal or termination condition.
+
+When the desired object is a ground track or path, guidance may compute a required heading/turn target from wind and path geometry, but Heading is still propagated as state.
 
 ### Altitude
 
-Altitude is likewise a state quantity. `Target Altitude` is a goal or termination condition, not a direct control.
+Altitude is a state quantity. `Target Altitude` is a goal/constraint, not a direct input.
 
-### Coordinated flight assumption
+### Coordinated-flight assumption
 
-For the current scope, ordinary maneuvers assume ideal coordinated flight. Yaw / rudder is solved implicitly by that assumption and is not exposed as a command.
+For the current scope, ordinary maneuvers assume ideal coordinated flight. Rudder/Yaw coordination is implicit and not exposed as a command.
 
-Intentional sideslip, including Forward Slip, is explicitly outside the current scope. Preserve the architecture so a sideslip state/input can be added later without rewriting unrelated code.
+Intentional sideslip, including Forward Slip, is explicitly outside current scope. Preserve architecture so a sideslip state/input can be added later without rewriting unrelated code.
 
-## 3. Weight and fuel
+## 3. Maneuver semantics come from the narrative
+
+The training procedure must be parsed into semantic roles rather than treated as a table lookup.
+
+For each maneuver/phase, distinguish:
+
+- target;
+- limit;
+- nominal value;
+- approximate initial setting;
+- control relationship;
+- path constraint;
+- environment-dependent correction rule;
+- entry/exit/termination condition;
+- advisory Reference Data.
+
+Example from Chapter 5 Basic Flight narrative:
+
+```text
+altitude correction -> Pitch
+speed correction    -> Power
+```
+
+This is a source-defined control relationship and is more important to the model than a chapter-end Pitch/Power pair.
+
+The implementation must not assume that the same relationship applies to every maneuver. Use the applicable maneuver narrative.
+
+## 4. Why Reference Data is advisory
+
+The training procedure's general discussion of Power Setting/Pitch Attitude describes them as approximate indications used to obtain desired flight parameters and notes that they vary with weight and external environment.
+
+The Chapter 4/5 `Reference Data` sections similarly state that Pitch and Power values are generally standard-atmosphere values, vary with weight/temperature/altitude, and should not be chased by instrument fixation.
+
+Therefore a Reference Data row may be attached as:
+
+```text
+AdvisoryReference
+```
+
+but it must not automatically define:
+
+- maneuver target;
+- control law;
+- required fixed input;
+- aircraft performance surface.
+
+A direct-input experiment may intentionally hold the row values, but it must be labeled as such and must not be presented as the official maneuver behavior.
+
+## 5. Weight and fuel
 
 Weight belongs to aircraft state, not Environment.
 
@@ -52,132 +103,228 @@ fuel(t + dt) = fuel(t) - fuel_flow(t) * dt
 weight(t)    = non_fuel_weight + remaining_fuel_weight(t)
 ```
 
-The exact fuel-density convention and any unusable-fuel treatment must be sourced and documented.
+The exact fuel-density convention and unusable-fuel treatment must be sourced/documented.
 
-Do not hold aircraft weight constant when the active performance model provides fuel flow and the simulated duration is long enough for fuel burn to matter.
+When the active performance model provides fuel flow, update fuel and weight continuously enough for the intended accuracy.
 
-## 4. Fixed configuration assumptions
+Current weight must be supplied to performance queries whenever the source table/model requires it.
+
+If a published performance table applies at a particular weight and no documented correction exists, retain that applicability restriction. Do not invent a weight correction merely to keep the API continuous.
+
+## 6. Fixed target-aircraft configuration
 
 For the target SR22 training configuration:
 
-- Gear is fixed and therefore not represented as a variable state or input.
-- The nose wheel pant / fairing is assumed removed throughout the simulation.
-- Performance effects of this configuration must come from an explicit source-backed correction when available.
+- Gear is fixed and therefore not represented as a variable state/input;
+- Nose wheel pant / fairing is assumed removed throughout simulation;
+- coordinated flight is the ordinary assumption.
 
-Do not silently apply a guessed wheel-pant correction.
+Some source material contains Gear fields or Gear-related procedure text. Preserve such content in source provenance where necessary, but do not infer a variable Gear model from it for this project.
 
-## 5. Performance-table interpolation
+Do not silently apply a guessed wheel-pant performance correction.
 
-The SR22 POH / approved flight-manual Chapter 5 tables should be treated as a multidimensional performance data set rather than isolated lookup pages.
+## 7. POH multidimensional interpolation
 
-Where supported by source data, build interpolators over independent variables such as:
+SR22 POH / approved-flight-manual Chapter 5 data is a first-class quantitative modeling source.
 
-- pressure altitude
-- temperature / ISA deviation
-- power
-- weight, if the table or an approved correction supplies it
-- configuration
+Where the source supports it, build multidimensional interpolators over actual source variables such as:
+
+- pressure altitude;
+- OAT / ISA deviation;
+- PWR;
+- weight, where supported directly or by a documented correction;
+- flap/configuration, where a table actually defines it.
 
 Dependent quantities may include:
 
-- TAS
-- fuel flow
-- climb rate
-- climb time
-- climb distance
-- climb fuel
-- descent / cruise quantities where published
+- TAS;
+- fuel flow;
+- climb rate;
+- climb time;
+- climb distance;
+- climb fuel;
+- other published performance quantities.
 
-Interpolation must stay inside the supported source domain unless an explicit, reviewed extrapolation rule exists. Default behavior is **no extrapolation**.
+### Interpolation rules
 
-## 6. What multidimensional POH interpolation can and cannot provide
+- canonical source data remains immutable;
+- exact source nodes must reproduce source values;
+- default is no extrapolation;
+- units and axes are explicit;
+- generated dense grids are derived artifacts and reproducible;
+- prefer piecewise linear / multilinear interpolation first;
+- combine tables only after confirming compatible definitions and applicability;
+- provenance follows every performance result.
 
-Multidimensional interpolation can provide a substantial part of the model, especially for **quasi-steady operating points**. It is therefore a first-class modeling method in this project.
+## 8. What POH interpolation contributes to the motion model
 
-However, an interpolated performance table is not automatically a complete arbitrary-state dynamic model. A source table usually describes selected stabilized conditions and may not independently span every combination of Pitch, Bank, PWR and Flap.
+POH multidimensional interpolation can provide a substantial portion of a useful quasi-steady aircraft model. It should be treated as a **primary performance provider**, not merely a correction layer on top of training Reference Data.
 
-Accordingly:
-
-- use POH interpolation directly where the requested quantity is represented by the table dimensions;
-- use Aviation College Reference Data to anchor nominal Pitch / Bank / PWR / Flap operating points for training maneuvers;
-- use physical equations for turn geometry, wind and state propagation;
-- interpolate between source-backed operating points when the source coverage supports it;
-- do not manufacture a unique TAS or vertical speed for arbitrary undocumented combinations merely because numerical interpolation is possible.
-
-The initial implementation should favor a **quasi-steady segment model**. Transient acceleration and attitude-transition models can be added later when sufficient evidence or calibration data exists.
-
-## 7. Suggested quasi-steady interpretation
-
-For a commanded flight segment:
+A useful architecture is:
 
 ```text
-Pitch / Bank / PWR / Flap
-          +
-Altitude / Temperature / Weight
-          |
-          v
-Performance / Reference model
-          |
-          +--> airspeed
-          +--> vertical speed or flight-path angle
-          +--> fuel flow
-          |
-          v
-Coordinated-turn + wind equations
-          |
-          v
-Position / Heading / Altitude / Fuel / Weight
+current state
++ environment
++ applicable PWR/configuration
+        |
+        v
+POH performance query
+        |
+        +--> TAS / performance quantity where published
+        +--> fuel flow where published
+        +--> climb/descent performance where published
+        |
+        v
+analytical physics + maneuver constraints
+        |
+        v
+state propagation
 ```
 
-When the source data defines a nominal maneuver point rather than a continuous surface, the implementation should explicitly mark that result as reference-based or calibrated rather than pretending it is a direct POH lookup.
+However, POH tables do not automatically define every arbitrary combination of Pitch, Bank, PWR and Flap as an unconstrained transient dynamics model.
 
-## 8. Wind
+In particular, if Pitch is not an independent variable in the source performance data, the implementation must not pretend that interpolating unrelated tables creates a validated `Pitch -> TAS/VS` law.
+
+Instead, connect Pitch to the motion model only through one of:
+
+1. a source-defined control relationship / maneuver target;
+2. an analytically defensible relationship with all required quantities available;
+3. an explicit, documented calibration/model assumption;
+4. a supported quasi-steady operating-region model.
+
+Otherwise mark the requested operating point unsupported.
+
+## 9. Model-coverage philosophy
+
+The external API can still expose:
+
+```text
+FlightInput = Pitch / Bank / PWR / Flap
+```
+
+while the initial aircraft-response model supports only a subset of that state space.
+
+Every quantitative result should be able to report a coverage/fidelity status, for example:
+
+- `poh_table_value`;
+- `poh_interpolated`;
+- `procedure_target`;
+- `physics_derived`;
+- `calibrated`;
+- `assumption_dependent`;
+- `unsupported`;
+- `out_of_domain`.
+
+Do not widen model coverage by using Reference Data as undocumented filler.
+
+## 10. Quasi-steady segment interpretation
+
+The preferred initial implementation is phase/segment based.
+
+A source-derived maneuver phase may look conceptually like:
+
+```text
+Targets / constraints
+    IAS / altitude / path / turn geometry
+
+Initial or nominal settings
+    approximate PWR / nominal Bank / etc.
+
+Control relationships
+    error in controlled quantity -> Pitch / Bank / PWR adjustment
+
+Aircraft response
+    POH performance + physics
+
+Termination
+    source-defined completion / target / safety event
+```
+
+This structure allows inputs to change as required by wind, weight and atmosphere while still preserving the procedure's actual objective.
+
+## 11. Spiral Descent interpretation
+
+The Chapter 5 narrative is a useful example of why this design matters.
+
+The source provides elements including:
+
+- wind judgement;
+- a pylon/reference relationship;
+- entry aiming for 110 kt at pylon abeam;
+- approximate 10% Power during entry;
+- nominal 45-degree Bank with a maximum of 55 degrees;
+- a minimum training altitude of AGL 2,000 ft.
+
+These are not semantically equivalent numbers.
+
+The model should classify them as target, initial setting, nominal value, limit and path/safety constraint as applicable.
+
+Do not implement the official maneuver by holding the chapter-end `Pitch=-1`, `Bank=45`, `PWR=10` values for the entire maneuver merely because the Reference Data row lists them.
+
+That fixed-input case is valid only as a deliberate forward-simulation experiment.
+
+## 12. Wind
 
 Ground velocity is the vector sum of air-relative velocity and wind velocity.
 
-Meteorological wind direction is the direction **from which** the wind blows. Conversion code must be tested against canonical cases such as 270/20 producing an eastward wind vector.
+Meteorological wind direction is the direction **from which** the wind blows.
 
 Wind models should be polymorphic:
 
-- NoWind
-- ConstantWind
-- altitude-dependent wind
-- future spatial / temporal forecast wind, e.g. MSM
+- `NoWind`;
+- `ConstantWind`;
+- altitude-dependent wind;
+- future spatial/time-dependent forecast wind such as MSM.
 
-## 9. Reference Path vs Trajectory
+Reference Path geometry is independent of wind.
+
+## 13. Reference Path vs Trajectory
 
 Never conflate these objects.
 
-- **Reference Path**: desired geometry, independent of wind.
-- **Trajectory**: time-history generated by the aircraft model in an environment.
+- **Reference Path**: desired ground geometry, independent of wind.
+- **Trajectory**: time history generated by aircraft + environment + guidance/direct input.
 
-A path-following solver may compute commands that make Trajectory track Reference Path, but the two remain distinct and should be visualizable together.
+A path-following solver computes inputs that make Trajectory track Reference Path, but both remain separately visible/exportable.
 
-## 10. NAV calculations
+## 14. NAV calculations
 
-NAV calculations should use the same vector and wind conventions as the simulator.
+NAV calculations should use the same vector/wind conventions as simulation.
 
-For cut-angle / intercept work, define Cut Angle geometrically with respect to desired **ground track / reference course** unless a source explicitly defines another convention. With wind present, solve the heading required to produce that ground track.
+For cut-angle/intercept work, define Cut Angle geometrically with respect to desired **ground track / reference course** unless a governing source explicitly defines another convention.
+
+With wind present:
+
+1. define the desired cut/intercept ground track;
+2. solve required heading from wind triangle;
+3. determine GS;
+4. solve intercept geometry and time.
 
 The NAV layer should eventually provide:
 
-- desired course / track
-- WCA
-- required heading
-- GS
-- cut/intercept course
-- intercept point
-- cut flight time
-- gain/loss time where required
+- desired course / track;
+- WCA;
+- required heading;
+- GS;
+- cut/intercept course;
+- intercept point;
+- cut flight time;
+- gain/loss time where required.
 
-## 11. Model fidelity labels
+## 15. Model fidelity metadata
 
-Simulation outputs should retain enough metadata to identify how they were obtained, for example:
+Simulation outputs and intermediate values should retain semantic/provenance labels, including:
 
-- `source_table_interpolated`
-- `training_reference`
-- `physics_derived`
-- `calibrated`
-- `assumed`
+- `procedure_target`;
+- `procedure_limit`;
+- `procedure_nominal`;
+- `procedure_initial_setting`;
+- `advisory_reference`;
+- `poh_table_value`;
+- `poh_interpolated`;
+- `physics_derived`;
+- `calibrated`;
+- `assumed`;
+- `unsupported`.
 
-This is important for aviation training use: a numerically smooth answer must not obscure the strength of its underlying evidence.
+This is essential for training use: numerical smoothness must not hide weak evidence or change the meaning of a source value.
