@@ -238,6 +238,8 @@ docker compose run --rm test
 
 This target contains only the source package, canonical bundled JSON and tests. It does not depend on a host Python installation, editable install, plotting stack or source PDFs.
 
+The Docker build validates the interpreter resolved by `PYTHON_VERSION` and fails explicitly below the package minimum of Python 3.11. A static regression test keeps the Dockerfile, Compose default and `requires-python` metadata aligned.
+
 Current regression groups cover:
 
 - exact unit conversions and angle wrapping;

@@ -2,7 +2,7 @@
 
 ## Near-term priorities
 
-### Initial implementation status (2026-08-16)
+### Initial implementation status
 
 Completed in the first package version:
 

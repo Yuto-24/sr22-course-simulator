@@ -67,13 +67,15 @@ def radians_to_degrees(value_rad: float) -> float:
 def wrap_radians_2pi(value_rad: float) -> float:
     """Wrap an angle into ``[0, 2*pi)``."""
 
-    return float(value_rad) % math.tau
+    wrapped = float(value_rad) % math.tau
+    return 0.0 if wrapped >= math.tau else wrapped
 
 
 def wrap_degrees_360(value_deg: float) -> float:
     """Wrap an angle into ``[0, 360)``."""
 
-    return float(value_deg) % 360.0
+    wrapped = float(value_deg) % 360.0
+    return 0.0 if wrapped >= 360.0 else wrapped
 
 
 def signed_angle_difference_rad(target_rad: float, current_rad: float) -> float:

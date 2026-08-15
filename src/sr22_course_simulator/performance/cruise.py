@@ -254,7 +254,12 @@ class CruisePerformanceResult:
             raise ValueError("fuel_flow must be a PerformanceResult")
         if (self.fuel_flow.quantity, self.fuel_flow.unit) != _FUEL_FLOW_OUTPUT:
             raise ValueError("fuel flow must remain in US gallons per hour")
-        if not isclose(self.power.value, requested_power, rel_tol=0.0, abs_tol=1e-12):
+        if not isclose(
+            self.power.value,
+            requested_power,
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        ):
             raise ValueError("resolved source power does not match the requested power")
         expected_query = self.power.query
         if self.true_airspeed.canonical.query != expected_query:

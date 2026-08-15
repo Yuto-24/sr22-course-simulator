@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+from collections.abc import Iterable
 from typing import Any
 
 from sr22_course_simulator.path.reference import ReferencePath
@@ -19,6 +21,19 @@ def _pyplot():
     return plt
 
 
+def _longitude_latitude_aspect(latitudes_deg: Iterable[float]) -> float | str:
+    """Return a local lon/lat display aspect, or a safe automatic fallback."""
+
+    latitudes = tuple(float(value) for value in latitudes_deg)
+    if not latitudes:
+        return "auto"
+    representative_latitude = 0.5 * (min(latitudes) + max(latitudes))
+    longitude_scale = abs(math.cos(math.radians(representative_latitude)))
+    if longitude_scale <= 1e-12:
+        return "auto"
+    return 1.0 / longitude_scale
+
+
 def plot_ground_track(
     trajectory: Trajectory,
     *,
@@ -29,17 +44,26 @@ def plot_ground_track(
     plt = _pyplot()
     figure, axes = plt.subplots()
     axes.plot(trajectory.longitudes_deg, trajectory.latitudes_deg, label="Trajectory")
+    path_points = ()
     if reference_path is not None:
-        points = reference_path.points()
+        path_points = reference_path.points()
         axes.plot(
-            [point.position.longitude_deg for point in points],
-            [point.position.latitude_deg for point in points],
+            [point.position.longitude_deg for point in path_points],
+            [point.position.latitude_deg for point in path_points],
             linestyle="--",
             label="Reference Path",
         )
     axes.set_xlabel("Longitude [deg]")
     axes.set_ylabel("Latitude [deg]")
-    axes.set_aspect("equal", adjustable="datalim")
+    axes.set_aspect(
+        _longitude_latitude_aspect(
+            (
+                *trajectory.latitudes_deg,
+                *(point.position.latitude_deg for point in path_points),
+            )
+        ),
+        adjustable="datalim",
+    )
     axes.grid(True)
     axes.legend()
     return figure, axes

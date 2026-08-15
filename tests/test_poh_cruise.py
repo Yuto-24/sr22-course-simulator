@@ -158,6 +158,34 @@ class BundledCruiseQueryTests(unittest.TestCase):
             EvidenceKind.POH_TABLE_VALUE,
         )
 
+    def test_power_round_trip_accepts_float_noise_but_rejects_material_mismatch(self) -> None:
+        result = self.query.query_canonical(
+            power_percent=77.0,
+            isa_deviation_deg_c=15.0,
+        )
+        roundoff_power = replace(
+            result.power,
+            value=result.power.value * (1.0 + 5e-13),
+        )
+
+        accepted = replace(result, power=roundoff_power)
+
+        self.assertGreater(accepted.power.value, accepted.requested_power_percent)
+        self.assertLess(
+            accepted.power.value - accepted.requested_power_percent,
+            1e-10,
+        )
+
+        material_mismatch = replace(
+            result.power,
+            value=result.power.value * (1.0 + 1e-8),
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "resolved source power does not match",
+        ):
+            replace(result, power=material_mismatch)
+
     def test_spiral_entry_power_is_explicitly_outside_cruise_source_domain(self) -> None:
         with self.assertRaises(OutOfDomainError) as caught:
             self.query.query_target_configuration(

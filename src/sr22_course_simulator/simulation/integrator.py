@@ -11,10 +11,11 @@ from sr22_course_simulator.aircraft.loading import FuelState
 from sr22_course_simulator.aircraft.model import AircraftResponseModel, QuasiSteadyResponse
 from sr22_course_simulator.aircraft.state import AircraftState, InitialState
 from sr22_course_simulator.environment import Environment
-from sr22_course_simulator.errors import ValidationError
+from sr22_course_simulator.errors import UnsupportedModelError, ValidationError
 from sr22_course_simulator.geometry import displace_position, enu_displacement
 from sr22_course_simulator.provenance import EvidenceKind
 from sr22_course_simulator.simulation.physics import (
+    VelocityENU,
     add_wind,
     air_velocity_enu,
     coordinated_turn_rate_rad_s,
@@ -93,6 +94,30 @@ def _seed_state(initial: InitialState, flight_input: FlightInput) -> AircraftSta
     )
 
 
+def _resolve_ground_track(
+    ground_velocity: VelocityENU,
+    *,
+    previous_track_true_rad: float | None,
+) -> float:
+    """Resolve track without assigning a direction to zero ground velocity.
+
+    Once the trajectory has established a valid track, an exact horizontal
+    velocity cancellation preserves that last track as state history.  At the
+    initial state there is no valid track to preserve, so the operating point
+    is explicitly unsupported.
+    """
+
+    track = ground_velocity.track_true_rad_or_none
+    if track is not None:
+        return track
+    if previous_track_true_rad is not None:
+        return previous_track_true_rad
+    raise UnsupportedModelError(
+        "Initial ground track is undefined at zero horizontal ground speed",
+        gap="A non-zero horizontal ground velocity is required to establish initial track",
+    )
+
+
 def _state_at_initial(
     initial: InitialState,
     flight_input: FlightInput,
@@ -108,12 +133,13 @@ def _state_at_initial(
         air,
         environment.wind.velocity_at(initial.position, initial.altitude_m, initial.time_s),
     )
+    track_true_rad = _resolve_ground_track(ground, previous_track_true_rad=None)
     return AircraftState(
         time_s=initial.time_s,
         position=initial.position,
         altitude_m=initial.altitude_m,
         heading_true_rad=initial.heading_true_rad,
-        track_true_rad=ground.track_true_rad,
+        track_true_rad=track_true_rad,
         true_airspeed_mps=response.true_airspeed_mps,
         ground_speed_mps=ground.horizontal_speed_mps,
         vertical_speed_mps=ground.up_mps,
@@ -149,6 +175,10 @@ def _advance(
     )
     wind = environment.wind.velocity_at(current.position, current.altitude_m, current.time_s + 0.5 * dt_s)
     ground = add_wind(air, wind)
+    track_true_rad = _resolve_ground_track(
+        ground,
+        previous_track_true_rad=current.track_true_rad,
+    )
     next_position = displace_position(
         current.position,
         east_m=ground.east_mps * dt_s,
@@ -163,7 +193,7 @@ def _advance(
         position=next_position,
         altitude_m=current.altitude_m + ground.up_mps * dt_s,
         heading_true_rad=current.heading_true_rad + heading_delta,
-        track_true_rad=ground.track_true_rad,
+        track_true_rad=track_true_rad,
         true_airspeed_mps=response.true_airspeed_mps,
         ground_speed_mps=ground.horizontal_speed_mps,
         vertical_speed_mps=ground.up_mps,
@@ -251,7 +281,12 @@ class ForwardSimulator:
                 else SimulationOutcome.GOAL_REACHED
             )
             return SimulationResult(
-                Trajectory(tuple(states)), outcome, initial_event, aircraft_model.name, "forward"
+                trajectory=Trajectory(tuple(states)),
+                outcome=outcome,
+                termination_event=initial_event,
+                model_name=aircraft_model.name,
+                mode="forward",
+                notes=first_response.notes,
             )
 
         for step in range(config.max_steps):

@@ -54,6 +54,8 @@ from sr22_course_simulator.units import (
     metres_per_second_to_knots,
     nautical_miles_to_metres,
     radians_to_degrees,
+    wrap_degrees_360,
+    wrap_radians_2pi,
 )
 
 
@@ -99,6 +101,7 @@ class CoreSimulationTestCase(unittest.TestCase):
         fuel_flow_kg_s: float = 0.0,
         reference_angle_of_attack_rad: float = 0.0,
         maximum_bank_rad: float = math.radians(70.0),
+        tas_per_power_fraction_mps: float = 0.0,
     ) -> QuasiSteadyAircraftModel:
         domain = AssumptionDomain(
             minimum_pitch_rad=math.radians(-30.0),
@@ -114,7 +117,7 @@ class CoreSimulationTestCase(unittest.TestCase):
             reference_true_airspeed_mps=tas_mps,
             reference_power_fraction=self.POWER_FRACTION,
             reference_pitch_rad=0.0,
-            tas_per_power_fraction_mps=0.0,
+            tas_per_power_fraction_mps=tas_per_power_fraction_mps,
             tas_per_pitch_rad_mps=0.0,
             zero_power_fuel_flow_kg_s=fuel_flow_kg_s,
             fuel_flow_per_power_fraction_kg_s=0.0,
@@ -174,6 +177,17 @@ class UnitConversionTests(CoreSimulationTestCase):
             with self.subTest(expected=expected):
                 self.assertAlmostEqual(actual, expected, places=12)
 
+    def test_angle_wrapping_clamps_rounded_upper_bound_to_zero(self) -> None:
+        smallest_negative = -math.ulp(0.0)
+
+        wrapped_radians = wrap_radians_2pi(smallest_negative)
+        wrapped_degrees = wrap_degrees_360(smallest_negative)
+
+        self.assertEqual(wrapped_radians, 0.0)
+        self.assertLess(wrapped_radians, math.tau)
+        self.assertEqual(wrapped_degrees, 0.0)
+        self.assertLess(wrapped_degrees, 360.0)
+
 
 class WindTests(CoreSimulationTestCase):
     def test_no_wind_returns_zero_enu_vector(self) -> None:
@@ -222,6 +236,19 @@ class AnalyticalTurnTests(CoreSimulationTestCase):
 
 
 class ForwardPropagationTests(CoreSimulationTestCase):
+    def test_initial_termination_preserves_first_response_notes(self) -> None:
+        result = self.simulate(termination=ElapsedTime(0.0))
+
+        self.assertEqual(len(result.trajectory), 1)
+        self.assertEqual(
+            result.notes,
+            (
+                "Caller-supplied local steady-point relation; not SR22 POH data.",
+                "No transient response, bank drag correction, or arbitrary-flight-envelope claim.",
+                "Fixed-angle-of-attack longitudinal closure; source or calibration required.",
+            ),
+        )
+
     def test_no_wind_zero_bank_flight_is_straight_and_level(self) -> None:
         duration_s = 20.0
         result = self.simulate(termination=ElapsedTime(duration_s), dt_s=0.5)
@@ -259,6 +286,44 @@ class ForwardPropagationTests(CoreSimulationTestCase):
         )
         self.assertAlmostEqual(result.trajectory.final.track_true_rad, expected_track, places=12)
         self.assertAlmostEqual(result.trajectory.final.heading_true_rad, 0.0, places=12)
+
+    def test_exact_later_headwind_cancellation_preserves_last_valid_track(self) -> None:
+        initial_input = self.make_input()
+        cancellation_input = FlightInput(
+            pitch_rad=0.0,
+            bank_rad=0.0,
+            power_fraction=0.25,
+            flap=FlapSetting.RETRACTED,
+        )
+
+        class StepInputSource:
+            def initial_input(self, initial, environment):
+                return initial_input
+
+            def input_at(self, state, progress, environment):
+                return cancellation_input
+
+        model = self.make_model(tas_per_power_fraction_mps=40.0)
+        environment = self.make_environment(
+            ConstantWind(WindVector(east_mps=0.0, north_mps=-40.0))
+        )
+        initial = self.make_initial()
+        result = simulate_forward(
+            initial=initial,
+            environment=environment,
+            input_source=StepInputSource(),
+            aircraft_model=model,
+            termination=ElapsedTime(1.0),
+            config=SimulationConfig(dt_s=1.0, max_steps=2),
+        )
+
+        self.assertEqual(result.trajectory.initial.ground_speed_mps, 10.0)
+        self.assertEqual(result.trajectory.final.ground_speed_mps, 0.0)
+        self.assertEqual(
+            result.trajectory.final.track_true_rad,
+            result.trajectory.initial.track_true_rad,
+        )
+        self.assertEqual(result.trajectory.final.position, initial.position)
 
     def test_constant_bank_calm_turn_matches_circle_and_heading(self) -> None:
         bank_rad = math.radians(30.0)
@@ -417,6 +482,23 @@ class FuelAndLoadingTests(CoreSimulationTestCase):
 
 
 class UnsupportedModelTests(CoreSimulationTestCase):
+    def test_exact_initial_headwind_cancellation_is_explicitly_unsupported(self) -> None:
+        environment = self.make_environment(
+            ConstantWind(WindVector(east_mps=0.0, north_mps=-self.TAS_MPS))
+        )
+
+        with self.assertRaises(UnsupportedModelError) as raised:
+            self.simulate(
+                environment=environment,
+                termination=ElapsedTime(1.0),
+            )
+
+        self.assertIn("Initial ground track is undefined", str(raised.exception))
+        self.assertEqual(
+            raised.exception.gap,
+            "A non-zero horizontal ground velocity is required to establish initial track",
+        )
+
     def test_missing_source_performance_fails_explicitly(self) -> None:
         required_source = "SR22 approved Chapter 5 performance table"
         model = QuasiSteadyAircraftModel(

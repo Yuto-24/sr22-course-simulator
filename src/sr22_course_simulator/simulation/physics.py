@@ -59,10 +59,27 @@ class VelocityENU:
         return math.hypot(self.east_mps, self.north_mps)
 
     @property
-    def track_true_rad(self) -> float:
+    def track_true_rad_or_none(self) -> float | None:
+        """Return track when horizontal velocity defines one, otherwise ``None``.
+
+        Zero horizontal velocity is a valid velocity result, but it does not
+        geometrically define a track.  State propagation can use this optional
+        form to apply its explicit previous-track policy without manufacturing
+        a direction of travel.
+        """
+
         if self.horizontal_speed_mps == 0.0:
-            raise ValidationError("track is undefined for zero horizontal velocity")
+            return None
         return wrap_radians_2pi(math.atan2(self.east_mps, self.north_mps))
+
+    @property
+    def track_true_rad(self) -> float:
+        """Return defined track, retaining the strict legacy accessor."""
+
+        track = self.track_true_rad_or_none
+        if track is None:
+            raise ValidationError("track is undefined for zero horizontal velocity")
+        return track
 
 
 def air_velocity_enu(

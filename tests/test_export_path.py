@@ -4,6 +4,7 @@ import math
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 from xml.etree import ElementTree as ET
 
 from sr22_course_simulator.aircraft import AircraftState, FlapSetting, GeoPosition
@@ -11,6 +12,7 @@ from sr22_course_simulator.environment import ConstantWind, NoWind
 from sr22_course_simulator.export import reference_path_to_kml, trajectory_to_kml, write_kml
 from sr22_course_simulator.geometry import distance_m, displace_position
 from sr22_course_simulator.path import PathPoint, PolylineReferencePath, PylonSpiralPath
+from sr22_course_simulator.plotting import plots as plotting_plots
 from sr22_course_simulator.simulation import Trajectory
 
 
@@ -144,6 +146,74 @@ class KmlTests(unittest.TestCase):
             returned = write_kml(content, destination)
             self.assertEqual(returned, destination)
             self.assertEqual(destination.read_text(encoding="utf-8"), content)
+
+
+class _RecordingAxes:
+    def __init__(self) -> None:
+        self.aspect = None
+        self.adjustable = None
+
+    def plot(self, *args, **kwargs) -> None:
+        pass
+
+    def set_xlabel(self, label: str) -> None:
+        pass
+
+    def set_ylabel(self, label: str) -> None:
+        pass
+
+    def set_aspect(self, aspect, *, adjustable: str) -> None:
+        self.aspect = aspect
+        self.adjustable = adjustable
+
+    def grid(self, enabled: bool) -> None:
+        pass
+
+    def legend(self) -> None:
+        pass
+
+
+class _RecordingPyplot:
+    def __init__(self, axes: _RecordingAxes) -> None:
+        self.axes = axes
+        self.figure = object()
+
+    def subplots(self):
+        return self.figure, self.axes
+
+
+class PlottingTests(unittest.TestCase):
+    def test_ground_track_aspect_uses_trajectory_and_reference_latitudes(self) -> None:
+        trajectory = Trajectory(
+            (
+                _state(0.0, GeoPosition(0.0, 10.0), 100.0),
+                _state(1.0, GeoPosition(0.0, 10.1), 100.0),
+            )
+        )
+        reference_path = PolylineReferencePath(
+            "high-latitude reference",
+            (
+                PathPoint(GeoPosition(60.0, 10.0), 100.0),
+                PathPoint(GeoPosition(60.0, 10.1), 100.0),
+            ),
+        )
+        axes = _RecordingAxes()
+        pyplot = _RecordingPyplot(axes)
+
+        with patch.object(plotting_plots, "_pyplot", return_value=pyplot):
+            figure, returned_axes = plotting_plots.plot_ground_track(
+                trajectory,
+                reference_path=reference_path,
+            )
+
+        self.assertIs(figure, pyplot.figure)
+        self.assertIs(returned_axes, axes)
+        self.assertAlmostEqual(axes.aspect, 1.0 / math.cos(math.radians(30.0)))
+        self.assertEqual(axes.adjustable, "datalim")
+
+    def test_ground_track_aspect_falls_back_for_empty_or_polar_latitudes(self) -> None:
+        self.assertEqual(plotting_plots._longitude_latitude_aspect(()), "auto")
+        self.assertEqual(plotting_plots._longitude_latitude_aspect((90.0,)), "auto")
 
 
 if __name__ == "__main__":

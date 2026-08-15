@@ -316,9 +316,11 @@ def simulate_guided_spiral_descent(
     simulation = replace(
         simulation,
         mode="maneuver_guidance",
-        notes=simulation.notes
-        + (
-            "Minimum implementation stops at 2,000 ft AGL; the source contingency to hold altitude and continue to the prescribed heading is not yet simulated.",
+        notes=(
+            *simulation.notes,
+            f"Minimum implementation stops at {minimum_agl.value:g} {minimum_agl.unit} AGL; "
+            "the source contingency to hold altitude and continue to the prescribed heading "
+            "is not yet simulated.",
             "Recovery after rollout is encoded in ManeuverSpec but not propagated by this guidance run.",
         ),
     )

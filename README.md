@@ -260,7 +260,7 @@ Windows / macOS の Docker Desktop では `LOCAL_UID` / `LOCAL_GID` を省略で
 docker compose run --rm test
 ```
 
-`PYTHON_VERSION`、`LOCAL_UID`、`LOCAL_GID` は build args / Compose 環境変数として上書き可能です。Container は非 root user で動作し、PDF 原資料や Matplotlib を runtime image に含めません。
+`PYTHON_VERSION`、`LOCAL_UID`、`LOCAL_GID` は build args / Compose 環境変数として上書き可能です。`PYTHON_VERSION` が解決する interpreter は Python 3.11 以上でなければならず、それ未満では image build が明示的に失敗します。Container は非 root user で動作し、PDF 原資料や Matplotlib を runtime image に含めません。
 
 ## 実行例
 

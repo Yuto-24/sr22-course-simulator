@@ -465,6 +465,36 @@ class SpiralGuidanceTests(unittest.TestCase):
         self.assertGreater(len(guided.guidance_history), 0)
         self.assertNotEqual(guided.simulation.mode, forward.mode)
 
+    def test_guided_run_note_uses_active_minimum_agl_value_and_unit(self) -> None:
+        minimum_height = _only_quantity(
+            self.package.spec.safety_constraints,
+            "minimum_training_height",
+        )
+        changed_minimum = replace(minimum_height, value=2500.0)
+        changed_spec = replace(
+            self.package.spec,
+            safety_constraints=(changed_minimum,),
+        )
+
+        guided = simulate_guided_spiral_descent(
+            initial=self.initial_state(),
+            environment=self.environment(),
+            maneuver_spec=changed_spec,
+            reference_path=self.path,
+            guidance_config=self.config,
+            aircraft_model=_ConstantAssumptionResponseModel(),
+            termination=ElapsedTime(0.2),
+            simulation_config=SimulationConfig(dt_s=0.2, max_steps=5),
+        )
+
+        self.assertTrue(
+            any(
+                note.startswith("Minimum implementation stops at 2500 ft AGL;")
+                for note in guided.simulation.notes
+            )
+        )
+        self.assertFalse(any("2,000 ft AGL" in note for note in guided.simulation.notes))
+
 
 if __name__ == "__main__":
     unittest.main()
