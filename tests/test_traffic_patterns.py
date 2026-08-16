@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 from xml.etree import ElementTree as ET
 
 from sr22_course_simulator.aircraft import GeoPosition
@@ -71,6 +72,16 @@ class AipMasterDataTests(unittest.TestCase):
             1_250.0,
             delta=40.0,
         )
+
+    def test_runway_rejects_bearing_inconsistent_with_thresholds(self) -> None:
+        runway = RJFM.runway("09")
+        with self.assertRaisesRegex(ValidationError, "threshold geometry"):
+            replace(runway, true_bearing_deg=runway.true_bearing_deg + 0.2)
+
+    def test_runway_rejects_length_inconsistent_with_thresholds(self) -> None:
+        runway = RJFM.runway("09")
+        with self.assertRaisesRegex(ValidationError, "threshold geometry"):
+            replace(runway, declared_length_m=runway.declared_length_m + 16.0)
 
     def test_magnetic_variation_uses_east_positive_convention(self) -> None:
         self.assertAlmostEqual(RJFM.variation_at(2020.0), -7.0)
@@ -223,6 +234,32 @@ class TrafficPatternKmlTests(unittest.TestCase):
             for path in written:
                 self.assertEqual(path.parent, Path(directory))
                 ET.fromstring(path.read_text(encoding="utf-8"))
+
+    def test_writer_keeps_filename_paired_when_spec_order_changes(self) -> None:
+        specs = tuple(reversed(rjfm_normal_pattern_specs()))
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "sr22_course_simulator.examples.miyazaki_traffic_patterns."
+            "rjfm_normal_pattern_specs",
+            return_value=specs,
+        ):
+            written = write_rjfm_normal_pattern_kmls(
+                directory,
+                include_combined=False,
+            )
+
+            self.assertEqual(
+                tuple(path.name for path in written),
+                tuple(
+                    f"RJFM_RWY{spec.runway.designation}_{spec.label.value.upper()}.kml"
+                    for spec in specs
+                ),
+            )
+            for spec, path in zip(specs, written, strict=True):
+                root = ET.fromstring(path.read_text(encoding="utf-8"))
+                self.assertEqual(
+                    root.findtext(".//k:Placemark/k:name", namespaces=KML_NS),
+                    spec.name,
+                )
 
     def test_multi_placemark_export_rejects_empty_input(self) -> None:
         with self.assertRaisesRegex(ValueError, "at least one placemark"):

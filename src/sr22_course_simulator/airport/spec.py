@@ -12,7 +12,7 @@ import re
 
 from sr22_course_simulator.aircraft.state import GeoPosition
 from sr22_course_simulator.errors import ValidationError
-from sr22_course_simulator.geometry import distance_m
+from sr22_course_simulator.geometry import distance_m, enu_displacement
 from sr22_course_simulator.provenance import SourceCitation
 from sr22_course_simulator.units import wrap_degrees_360
 
@@ -21,6 +21,9 @@ _AIP_DMS_PATTERN = re.compile(
     r"^(?P<degrees>\d{2,3})(?P<minutes>\d{2})(?P<seconds>\d{2}(?:\.\d+)?)(?P<hemisphere>[NSEW])$",
     re.IGNORECASE,
 )
+
+RUNWAY_BEARING_TOLERANCE_DEG = 0.1
+RUNWAY_LENGTH_TOLERANCE_M = 15.0
 
 
 def parse_aip_dms(value: str) -> float:
@@ -108,7 +111,7 @@ class RunwaySpec:
         if not isinstance(self.source, SourceCitation):
             raise ValidationError("runway source must be a SourceCitation")
 
-        bearing = _finite(self.true_bearing_deg, "true_bearing_deg")
+        bearing = wrap_degrees_360(_finite(self.true_bearing_deg, "true_bearing_deg"))
         elevation_a = _finite(
             self.threshold_elevation_a_ft, "threshold_elevation_a_ft"
         )
@@ -120,8 +123,35 @@ class RunwaySpec:
         if declared_length <= 0.0 or width <= 0.0:
             raise ValidationError("runway dimensions must be positive")
 
+        threshold_east_m, threshold_north_m = enu_displacement(
+            self.threshold_a,
+            self.threshold_b,
+        )
+        threshold_bearing_deg = wrap_degrees_360(
+            math.degrees(math.atan2(threshold_east_m, threshold_north_m))
+        )
+        bearing_difference_deg = abs(
+            (bearing - threshold_bearing_deg + 180.0) % 360.0 - 180.0
+        )
+        if bearing_difference_deg > RUNWAY_BEARING_TOLERANCE_DEG:
+            raise ValidationError(
+                "true_bearing_deg differs from threshold geometry by "
+                f"{bearing_difference_deg:.3f} deg; maximum is "
+                f"{RUNWAY_BEARING_TOLERANCE_DEG:.3f} deg"
+            )
+
+        length_difference_m = abs(
+            distance_m(self.threshold_a, self.threshold_b) - declared_length
+        )
+        if length_difference_m > RUNWAY_LENGTH_TOLERANCE_M:
+            raise ValidationError(
+                "declared_length_m differs from threshold geometry by "
+                f"{length_difference_m:.3f} m; maximum is "
+                f"{RUNWAY_LENGTH_TOLERANCE_M:.3f} m"
+            )
+
         object.__setattr__(self, "designation", designation)
-        object.__setattr__(self, "true_bearing_deg", wrap_degrees_360(bearing))
+        object.__setattr__(self, "true_bearing_deg", bearing)
         object.__setattr__(self, "threshold_elevation_a_ft", elevation_a)
         object.__setattr__(self, "threshold_elevation_b_ft", elevation_b)
         object.__setattr__(self, "declared_length_m", declared_length)

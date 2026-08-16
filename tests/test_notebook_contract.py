@@ -138,7 +138,7 @@ class TrafficPatternNotebookContractTests(unittest.TestCase):
             "DOWNWIND_OFFSET_NM = 1.5",
             "BASE_EXTENSION_NM = 1.2",
             "CROSSWIND_EXTENSION_NM = 0.0",
-            "MAGNETIC_EPOCH_YEAR = 2026.0",
+            "MAGNETIC_REFERENCE_YEAR = 2026.0",
         ):
             self.assertIn(expected, source)
 

@@ -35,12 +35,6 @@ RJFM_NORMAL_PATTERN_SOURCE = SourceCitation(
     ),
 )
 
-RJFM_PATTERN_FILENAMES = (
-    "RJFM_RWY09_NORTH.kml",
-    "RJFM_RWY09_SOUTH.kml",
-    "RJFM_RWY27_NORTH.kml",
-    "RJFM_RWY27_SOUTH.kml",
-)
 RJFM_COMBINED_PATTERN_FILENAME = "RJFM_ALL_NORMAL_PATTERNS.kml"
 
 
@@ -91,6 +85,33 @@ def rjfm_normal_pattern_specs(
     )
 
 
+def _rjfm_pattern_filename(spec: TrafficPatternSpec) -> str:
+    """Derive one output name from the specification paired with its path."""
+
+    return f"RJFM_RWY{spec.runway.designation}_{spec.label.value.upper()}.kml"
+
+
+RJFM_PATTERN_FILENAMES = tuple(
+    _rjfm_pattern_filename(spec) for spec in rjfm_normal_pattern_specs()
+)
+
+
+def _build_rjfm_normal_pattern_pairs(
+    *,
+    altitude_ft: float,
+    downwind_offset_nm: float,
+    base_extension_nm: float,
+    crosswind_extension_nm: float,
+) -> tuple[tuple[TrafficPatternSpec, PolylineReferencePath], ...]:
+    specs = rjfm_normal_pattern_specs(
+        altitude_ft=altitude_ft,
+        downwind_offset_nm=downwind_offset_nm,
+        base_extension_nm=base_extension_nm,
+        crosswind_extension_nm=crosswind_extension_nm,
+    )
+    return tuple((spec, generate_traffic_pattern(spec)) for spec in specs)
+
+
 def build_rjfm_normal_patterns(
     *,
     altitude_ft: float = 1_000.0,
@@ -100,13 +121,13 @@ def build_rjfm_normal_patterns(
 ) -> tuple[PolylineReferencePath, ...]:
     """Generate all four RJFM normal traffic-pattern reference paths."""
 
-    specs = rjfm_normal_pattern_specs(
+    pairs = _build_rjfm_normal_pattern_pairs(
         altitude_ft=altitude_ft,
         downwind_offset_nm=downwind_offset_nm,
         base_extension_nm=base_extension_nm,
         crosswind_extension_nm=crosswind_extension_nm,
     )
-    return tuple(generate_traffic_pattern(spec) for spec in specs)
+    return tuple(path for _, path in pairs)
 
 
 def write_rjfm_normal_pattern_kmls(
@@ -121,15 +142,19 @@ def write_rjfm_normal_pattern_kmls(
     """Write four individual KML files and optionally one combined KML file."""
 
     destination_path = Path(destination)
-    paths = build_rjfm_normal_patterns(
+    pairs = _build_rjfm_normal_pattern_pairs(
         altitude_ft=altitude_ft,
         downwind_offset_nm=downwind_offset_nm,
         base_extension_nm=base_extension_nm,
         crosswind_extension_nm=crosswind_extension_nm,
     )
+    paths = tuple(path for _, path in pairs)
     written = [
-        write_kml(reference_path_to_kml(path), destination_path / filename)
-        for path, filename in zip(paths, RJFM_PATTERN_FILENAMES, strict=True)
+        write_kml(
+            reference_path_to_kml(path),
+            destination_path / _rjfm_pattern_filename(spec),
+        )
+        for spec, path in pairs
     ]
     if include_combined:
         written.append(
