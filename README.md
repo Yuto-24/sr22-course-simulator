@@ -21,6 +21,8 @@ docker compose up --build notebook
 
 Terminal に表示された `http://127.0.0.1:8888/lab?token=...` をブラウザで開き、`spiral_descent_walkthrough.ipynb` を選びます。Notebook の `### 2. 初期状態・風・明示的な仮定を入力する` で条件を編集し、上から順に実行してください。
 
+宮崎空港の4本の場周経路を確認する場合は `miyazaki_traffic_patterns.ipynb` を選びます。ARP は参照用に保持し、RWY09 / RWY27 の threshold 中点を RWY Center Point として True Bearing で経路を生成します。詳しい定義は [Airport Traffic-Pattern Reference Paths](docs/traffic-patterns.md) を参照してください。
+
 結果は repository の `artifacts/` に保存されます。
 
 ```text
@@ -45,6 +47,7 @@ Notebook の編集内容は `notebooks/spiral_descent_walkthrough.ipynb` に保�
 | POH の canonical data を追加する | `src/sr22_course_simulator/data/poh/canonical/` | node 再現・範囲外拒否 test を追加 |
 | 数値の時系列を確認する | `artifacts/guided-trajectory.csv` | 単位は列名に明記 |
 | 3D 経路を確認する | `artifacts/*.kml` | Reference Path と Trajectory は別ファイル |
+| RJFM 場周経路を生成する | `notebooks/miyazaki_traffic_patterns.ipynb` | `artifacts/traffic-patterns/*.kml` |
 
 ## 目的
 
@@ -239,6 +242,7 @@ POH の補間から得られる性能値と、学訓本文の Target / Control R
 - [Data Sources and Interpolation](docs/data-sources.md)
 - [Validation](docs/validation.md)
 - [Notebook Workflow](docs/notebook-workflow.md)
+- [Airport Traffic-Pattern Reference Paths](docs/traffic-patterns.md)
 - [Roadmap](docs/roadmap.md)
 - [Agent Rules](AGENTS.md)
 
@@ -256,6 +260,7 @@ POH の補間から得られる性能値と、学訓本文の Target / Control R
 - wind-independent `ReferencePath` と time-indexed `Trajectory`
 - 2D Ground Track、Altitude-Time、3D plot helper（Matplotlib は optional）
 - Trajectory の CSV export、Trajectory / Reference Path の KML 3D LineString export
+- AIP 転記値を保持する `AirportSpec` / `RunwaySpec`、ARP 非依存の RWY Center Point、RJFM の4本の Normal Traffic Pattern と multi-Placemark KML
 
 ### Source coverage
 

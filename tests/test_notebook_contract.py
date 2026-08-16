@@ -7,6 +7,9 @@ import unittest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK_PATH = REPOSITORY_ROOT / "notebooks" / "spiral_descent_walkthrough.ipynb"
+TRAFFIC_PATTERN_NOTEBOOK_PATH = (
+    REPOSITORY_ROOT / "notebooks" / "miyazaki_traffic_patterns.ipynb"
+)
 
 
 class NotebookContractTests(unittest.TestCase):
@@ -92,6 +95,75 @@ class NotebookContractTests(unittest.TestCase):
         self.assertIn("New-Item -ItemType Directory -Force artifacts", readme)
         self.assertIn(r".\.venv\Scripts\python.exe", workflow)
         self.assertIn('$env:JUPYTER_PORT = "8890"', workflow)
+
+
+class TrafficPatternNotebookContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.notebook = json.loads(
+            TRAFFIC_PATTERN_NOTEBOOK_PATH.read_text(encoding="utf-8")
+        )
+        cls.cells = cls.notebook["cells"]
+
+    def test_required_sections_are_in_workflow_order(self) -> None:
+        markdown = "\n".join(
+            "".join(cell["source"])
+            for cell in self.cells
+            if cell["cell_type"] == "markdown"
+        )
+        section_positions = [
+            markdown.index(section)
+            for section in (
+                "## 1. AirportSpec",
+                "## 2. RWY True Bearing",
+                "## 3. RWY Center Point",
+                "## 4. Pattern parameters",
+                "## 5. 4 pattern",
+                "## 6. 簡易可視化",
+                "## 7. KML 出力",
+            )
+        ]
+        self.assertEqual(section_positions, sorted(section_positions))
+
+    def test_parameter_cell_exposes_all_requested_values(self) -> None:
+        parameter_cells = [
+            cell
+            for cell in self.cells
+            if "parameters" in cell.get("metadata", {}).get("tags", [])
+        ]
+        self.assertEqual(len(parameter_cells), 1)
+        source = "".join(parameter_cells[0]["source"])
+        for expected in (
+            "PATTERN_ALTITUDE_FT = 1000.0",
+            "DOWNWIND_OFFSET_NM = 1.5",
+            "BASE_EXTENSION_NM = 1.2",
+            "CROSSWIND_EXTENSION_NM = 0.0",
+            "MAGNETIC_EPOCH_YEAR = 2026.0",
+        ):
+            self.assertIn(expected, source)
+
+    def test_notebook_uses_center_based_generator_and_expected_kml_writer(self) -> None:
+        code = "\n".join(
+            "".join(cell["source"])
+            for cell in self.cells
+            if cell["cell_type"] == "code"
+        )
+        self.assertIn("runway.center_point", code)
+        self.assertIn("build_rjfm_normal_patterns(", code)
+        self.assertIn("write_rjfm_normal_pattern_kmls(", code)
+        self.assertIn("RJFM_PATTERN_FILENAMES", code)
+        self.assertNotIn("ConstantWind", code)
+        self.assertNotIn("NoWind", code)
+
+    def test_committed_notebook_is_clean_and_all_code_cells_compile(self) -> None:
+        self.assertEqual(self.notebook["nbformat"], 4)
+        self.assertEqual(self.notebook["metadata"]["kernelspec"]["name"], "python3")
+        for index, cell in enumerate(self.cells):
+            if cell["cell_type"] != "code":
+                continue
+            self.assertIsNone(cell["execution_count"])
+            self.assertEqual(cell["outputs"], [])
+            compile("".join(cell["source"]), f"traffic-notebook-cell-{index}", "exec")
 
 
 if __name__ == "__main__":

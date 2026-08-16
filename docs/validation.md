@@ -115,11 +115,18 @@ Examples:
 
 - straight-line endpoints and course;
 - arc center, radius and sweep angle;
-- traffic-pattern leg continuity;
+- AIP DMS parsing and RJFM threshold transcription;
+- threshold-derived runway length and ARP-to-threshold sanity distance;
+- RWY Center Point equality for reciprocal directions;
+- left/right traffic-pattern geometry and 1.5 NM downwind offset;
+- 1.2 NM base extension and explicit 0.0 NM crosswind extension;
+- fixed 1000 ft MSL path altitude and semantic waypoint order;
 - ground-reference geometry;
 - KML longitude/latitude/altitude ordering.
 
 Wind must not alter the Reference Path object itself.
+Changing the ARP must not move a traffic pattern; this guards the reference-only
+ARP boundary directly.
 
 ## 7. Guidance tests
 
@@ -251,7 +258,10 @@ Current regression groups cover:
 - verified POH cruise source nodes and source-backed target-configuration correction separation;
 - source-semantic Spiral Descent transcription, advisory isolation, Bank limit and phase-specific Power behavior;
 - Reference Path wind independence and pylon projection;
-- KML `longitude,latitude,altitude` order, coordinate count, altitude retention and XML escaping.
+- KML `longitude,latitude,altitude` order, coordinate count, altitude retention and XML escaping;
+- RJFM Airport/Runway master data, magnetic variation, four traffic-pattern paths,
+  four individual KML files and one four-Placemark KML document;
+- clean, compilable Notebook contracts for both Spiral Descent and RJFM traffic patterns.
 
 The runnable demonstration is also exercised as a smoke test, but its plausible shape is not treated as aircraft-model validation. Its assumption evidence must survive in the resulting `Trajectory`.
 

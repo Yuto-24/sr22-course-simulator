@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -22,31 +23,44 @@ def _coordinate_text(coordinates: tuple[tuple[float, float, float], ...]) -> str
     return "\n".join(f"{lon:.12g},{lat:.12g},{alt:.12g}" for lon, lat, alt in coordinates)
 
 
-def _document(name: str, coordinates: tuple[tuple[float, float, float], ...]) -> str:
-    """
-    Create a KML document containing an absolute-altitude line string.
-    
-    Parameters:
-        name (str): Name assigned to the document and placemark.
-        coordinates (tuple[tuple[float, float, float], ...]): Longitude, latitude, and altitude coordinates defining the line.
-    
-    Raises:
-        ValueError: If fewer than two coordinates are provided.
-    
-    Returns:
-        str: The serialized KML document.
-    """
+def _append_line_placemark(
+    document: ET.Element,
+    *,
+    name: str,
+    coordinates: tuple[tuple[float, float, float], ...],
+) -> None:
+    """Append one absolute-altitude LineString placemark."""
+
     if len(coordinates) < 2:
         raise ValueError("KML LineString requires at least two coordinates")
-    root = ET.Element(_tag("kml"))
-    document = ET.SubElement(root, _tag("Document"))
-    ET.SubElement(document, _tag("name")).text = name
     placemark = ET.SubElement(document, _tag("Placemark"))
     ET.SubElement(placemark, _tag("name")).text = name
     line = ET.SubElement(placemark, _tag("LineString"))
     ET.SubElement(line, _tag("tessellate")).text = "0"
     ET.SubElement(line, _tag("altitudeMode")).text = "absolute"
     ET.SubElement(line, _tag("coordinates")).text = _coordinate_text(coordinates)
+
+
+def _document(
+    name: str,
+    placemarks: tuple[
+        tuple[str, tuple[tuple[float, float, float], ...]],
+        ...,
+    ],
+) -> str:
+    """Create a KML document containing one or more LineStrings."""
+
+    if not placemarks:
+        raise ValueError("KML Document requires at least one placemark")
+    root = ET.Element(_tag("kml"))
+    document = ET.SubElement(root, _tag("Document"))
+    ET.SubElement(document, _tag("name")).text = name
+    for placemark_name, coordinates in placemarks:
+        _append_line_placemark(
+            document,
+            name=placemark_name,
+            coordinates=coordinates,
+        )
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 
@@ -71,7 +85,7 @@ def trajectory_to_kml(trajectory: Trajectory, *, name: str = "Trajectory") -> st
         )
         for state in trajectory.states
     )
-    return _document(name, coordinates)
+    return _document(name, ((name, coordinates),))
 
 
 def reference_path_to_kml(reference_path: ReferencePath, *, name: str | None = None) -> str:
@@ -89,7 +103,33 @@ def reference_path_to_kml(reference_path: ReferencePath, *, name: str | None = N
         (point.position.longitude_deg, point.position.latitude_deg, point.altitude_m)
         for point in reference_path.points()
     )
-    return _document(name or reference_path.name, coordinates)
+    placemark_name = name or reference_path.name
+    return _document(placemark_name, ((placemark_name, coordinates),))
+
+
+def reference_paths_to_kml(
+    reference_paths: Iterable[ReferencePath],
+    *,
+    name: str = "Reference Paths",
+) -> str:
+    """Convert multiple reference paths to one multi-Placemark KML document."""
+
+    paths = tuple(reference_paths)
+    placemarks = tuple(
+        (
+            path.name,
+            tuple(
+                (
+                    point.position.longitude_deg,
+                    point.position.latitude_deg,
+                    point.altitude_m,
+                )
+                for point in path.points()
+            ),
+        )
+        for path in paths
+    )
+    return _document(name, placemarks)
 
 
 def write_kml(content: str, destination: str | Path) -> Path:

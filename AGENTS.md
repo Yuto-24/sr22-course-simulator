@@ -225,6 +225,23 @@ Always preserve the ability to display Reference Path and Trajectory separately.
 
 For a source-defined ground-reference maneuver, encode the source's path-control method rather than assuming fixed Bank.
 
+### Airport and runway geometry
+
+An Airport Reference Point (ARP) is reference-only. It may be displayed or used
+for a source sanity check, but it must not be used as the origin of runway or
+traffic-pattern geometry because it may not lie on the runway centerline.
+
+For every airport, define each runway geometry origin as:
+
+```text
+RWY Center Point = (RWY THR1 + RWY THR2) / 2
+```
+
+Build runway vectors and left/right normals from the source-backed True Bearing,
+and resolve airport traffic-pattern geometry from the RWY Center Point. Preserve
+Magnetic Variation as airport master data for display, checks and future use;
+do not use it to place KML or Reference Path coordinates.
+
 ## 12. NAV conventions
 
 Use a common vector implementation for simulation and NAV calculations.

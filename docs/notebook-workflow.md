@@ -12,6 +12,8 @@
 6. 終了理由、根拠ラベル、グラフを確認する。
 7. CSV / KML / PNG を保存する。
 
+`notebooks/miyazaki_traffic_patterns.ipynb` は別の workflow です。RJFM の Airport / Runway master data、threshold 中点の RWY Center Point、True Bearing、4本の風に依存しない Normal Traffic Pattern を順に確認し、`artifacts/traffic-patterns/` へ KML を保存します。ARP は表示・sanity check 専用です。
+
 現在の Spiral Descent 出力は、POH で検証された降下性能ではありません。確認済み POH Chapter 5 には 110 kt / 約 10% PWR / Bank 45〜55° の領域を定義する降下性能表がないため、Notebook でも `AssumedSteadyPointProvider` と固定迎角 closure を使用し、結果に `assumed` を残します。
 
 ## Docker で起動する
@@ -42,6 +44,8 @@ http://127.0.0.1:8888/lab?token=...
 ```
 
 URL を開き、`spiral_descent_walkthrough.ipynb` を選択します。終了時は起動した Terminal で `Ctrl+C` を押します。
+
+場周経路を生成する場合は、同じ JupyterLab で `miyazaki_traffic_patterns.ipynb` を選択して上から実行します。
 
 Notebook は `127.0.0.1` にだけ公開します。Token 認証を無効化していません。
 
@@ -74,12 +78,14 @@ Docker container 内の `/workspace/notebooks` はホストの `notebooks/`、`/
 | ホスト側の場所 | 内容 | Git 管理 |
 | --- | --- | --- |
 | `notebooks/spiral_descent_walkthrough.ipynb` | 入力セル、説明、保存したセル出力 | 対象 |
+| `notebooks/miyazaki_traffic_patterns.ipynb` | RJFM master data、4 pattern、KML 出力 | 対象 |
 | `artifacts/guided-trajectory.csv` | 1 state 1 row の時系列、単位付き列、evidence | 対象外 |
 | `artifacts/guided-trajectory.kml` | 風の影響を受けた Trajectory | 対象外 |
 | `artifacts/guided-reference-path.kml` | 風と独立した Reference Path | 対象外 |
 | `artifacts/guided-ground-track.png` | Trajectory と Reference Path の平面比較 | 対象外 |
 | `artifacts/guided-altitude-time.png` | 高度 MSL の時系列 | 対象外 |
 | `artifacts/guided-trajectory-3d.png` | 3 次元比較 | 対象外 |
+| `artifacts/traffic-patterns/*.kml` | RJFM の個別4 path と結合 KML | 対象外 |
 
 Notebook のセル出力を `.ipynb` に残す場合は、JupyterLab の `File > Save Notebook` を実行します。CSV / KML / PNG は各セルの実行時に上書きされます。
 
