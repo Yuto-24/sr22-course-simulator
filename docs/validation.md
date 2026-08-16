@@ -218,3 +218,43 @@ Initial practical sequence:
 Numerical tolerances must be chosen per test category and documented in the test itself.
 
 Avoid a single broad tolerance that can conceal regressions, source-transcription mistakes or model-coverage errors.
+
+## 13. Executable validation suite
+
+The initial implementation uses deterministic standard-library `unittest` tests, so validation does not depend on a plotting stack.
+
+Run all tests from the repository root:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+The same suite can be run in the portable container test target:
+
+```bash
+docker compose build
+docker compose run --rm test
+```
+
+This target contains only the source package, canonical bundled JSON and tests. It does not depend on a host Python installation, editable install, plotting stack or source PDFs.
+
+The Docker build validates the interpreter resolved by `PYTHON_VERSION` and fails explicitly below the package minimum of Python 3.11. A static regression test keeps the Dockerfile, Compose default and `requires-python` metadata aligned.
+
+Current regression groups cover:
+
+- exact unit conversions and angle wrapping;
+- canonical meteorological wind directions, including `270/20 -> East` and `000/20 -> South`;
+- analytical coordinated-turn rate/radius/load factor;
+- no-wind straight flight, wind-vector addition, constant-bank turns, vertical propagation and unwrapped accumulated turn;
+- fuel-flow integration, non-increasing fuel and current-weight reduction;
+- immutable canonical tables, strict loading, exact source nodes, N-dimensional interior interpolation, derived-grid separation and explicit out-of-domain rejection;
+- verified POH cruise source nodes and source-backed target-configuration correction separation;
+- source-semantic Spiral Descent transcription, advisory isolation, Bank limit and phase-specific Power behavior;
+- Reference Path wind independence and pylon projection;
+- KML `longitude,latitude,altitude` order, coordinate count, altitude retention and XML escaping.
+
+The runnable demonstration is also exercised as a smoke test, but its plausible shape is not treated as aircraft-model validation. Its assumption evidence must survive in the resulting `Trajectory`.
+
+## 14. Current validation limits
+
+Passing tests establish implementation correctness against the encoded sources, analytical equations and explicitly declared assumptions. They do not validate the assumption-dependent Spiral Descent response as actual SR22 performance. That requires an applicable source relationship or separately identified calibration/validation flight data.

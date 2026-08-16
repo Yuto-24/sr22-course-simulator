@@ -2,6 +2,30 @@
 
 ## Near-term priorities
 
+### Initial implementation status
+
+Completed in the first package version:
+
+- common SI units, Initial/Aircraft state, Pitch/Bank/PWR/Flap input, wind, terrain, fuel and weight conventions;
+- narrative-semantic `ManeuverSpec` and separately typed `AdvisoryReference`;
+- strict canonical POH JSON ingestion and no-extrapolation N-dimensional interpolation;
+- a verified 2,000-ft / 2500-RPM POH cruise slice and source/applicability metadata;
+- explicit unsupported/assumption-dependent response boundaries;
+- direct-input forward integration;
+- minimal Entry/Execution Spiral Descent guidance with bounded Bank/path/wind correction;
+- separate pylon Reference Path and simulated Trajectory;
+- KML and optional plotting helpers;
+- deterministic numerical/source-semantic tests.
+
+Still open before claiming source-backed SR22 Spiral Descent performance:
+
+- identify or calibrate the longitudinal `Pitch/PWR/state -> TAS/flight-path-angle` relationship for the applicable descent region;
+- source/implement a mass fuel-flow conversion applicable to the active cruise/descent data before using GPH in state propagation;
+- implement the narrative AGL 2,000-ft contingency (hold altitude, continue to prescribed heading) rather than conservatively stopping;
+- propagate the full rollout/level-off/Recovery phase;
+- expand canonical POH transcription beyond the initial verified cruise slice;
+- validate with independent flight data while preserving canonical source behavior.
+
 ### 1. Core state, units and environment
 
 Implement the common domain model first:

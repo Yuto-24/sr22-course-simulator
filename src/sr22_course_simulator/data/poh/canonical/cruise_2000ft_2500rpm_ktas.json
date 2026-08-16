@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "table_id": "sr22_g6.cruise.2000ft.2500rpm.ktas",
+  "axes": [
+    {
+      "name": "manifold_pressure_inhg",
+      "unit": "inHg",
+      "values": [23.4, 24.4, 25.4, 26.4, 27.4]
+    },
+    {
+      "name": "isa_deviation_deg_c",
+      "unit": "degC",
+      "values": [-30.0, 0.0, 30.0]
+    }
+  ],
+  "output": {
+    "name": "true_airspeed",
+    "unit": "kt"
+  },
+  "values": [
+    167.0, 167.0, 162.0,
+    170.0, 170.0, 165.0,
+    173.0, 173.0, 168.0,
+    176.0, 176.0, 171.0,
+    179.0, 179.0, 174.0
+  ],
+  "citation": {
+    "document_title": "SR22 G6 型式証明飛行規程 全章",
+    "revision": "P/N 13772-006J",
+    "effective_date": "2023-08-28",
+    "chapter": "5 Performance",
+    "section": "Cruise Performance",
+    "page": "5-32 (PDF page 192)",
+    "table": "2,000 ft / 2500 RPM cruise slice",
+    "extraction_method": "Manual transcription from a visually verified PDF vector rendering",
+    "transformations": [
+      "Rows reordered from descending MAP to ascending MAP; dependent values reordered identically",
+      "Flattened row-major with ISA-deviation axis varying fastest"
+    ],
+    "notes": [
+      "Canonical values are the printed POH nodes before configuration corrections",
+      "POH note: subtract 10 KTAS when the nose-wheel pant/fairing is removed"
+    ]
+  },
+  "applicability": {
+    "aircraft_model": "Cirrus SR22 G6",
+    "configuration": [
+      {"name": "weight", "value": 3400.0, "unit": "lb"},
+      {"name": "pressure_altitude", "value": 2000.0, "unit": "ft"},
+      {"name": "engine_speed", "value": 2500.0, "unit": "RPM"},
+      {"name": "canonical_wheel_fairing_baseline", "value": "installed"}
+    ],
+    "conditions": [
+      "No wind",
+      "Cruising above 85 percent Power is not recommended",
+      "Project target configuration requires the separately sourced nose-wheel-pant correction"
+    ]
+  }
+}

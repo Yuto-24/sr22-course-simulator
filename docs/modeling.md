@@ -328,3 +328,28 @@ Simulation outputs and intermediate values should retain semantic/provenance lab
 - `unsupported`.
 
 This is essential for training use: numerical smoothness must not hide weak evidence or change the meaning of a source value.
+
+## 16. Implemented Spiral Descent model coverage
+
+The primary training PDF was inspected at source pages 5-(34) and 5-(35). The implemented specification now records:
+
+- entry at a selected pylon with wind judgement and a normally tailwind-oriented setup;
+- 110 kt at pylon abeam;
+- approximately 10% Power as an Entry setting;
+- approximately -1 degree Pitch as a descent-attitude reference, not a frozen command;
+- 45-degree nominal Bank and 55-degree maximum Bank;
+- Pitch control of 110 kt;
+- Bank adjustment for Drift / pylon relationship / constant-radius correction;
+- 720-degree turn completion and the AGL 2,000 ft contingency;
+- the source recovery sequence.
+
+The source passage says `110 kt` but the encoded passage does not establish IAS/CAS/TAS. The `ManeuverSpec` therefore uses `AirspeedKind.UNSPECIFIED`. Current guidance runs only when its configuration explicitly acknowledges an assumption that interprets this value as TAS. No implicit IAS-to-TAS conversion exists.
+
+The current SR22 G6 POH Chapter 5 was also inspected. It contains cruise, climb and other published performance data, but no descent-response surface covering the Spiral Descent state. Consequently:
+
+- the production-safe response path remains unsupported for that state;
+- the runnable example is explicitly assumption-dependent;
+- the chapter-end training Reference Data is not used to close Pitch/PWR/Bank performance gaps;
+- coordinated-turn geometry, wind addition and fuel/weight integration remain analytical and independently testable.
+
+The minimal guidance controller uses source-defined semantic roles but has assumption-labeled gains. Entry Power is used only during the configured Entry interval; established Power is a separate caller-supplied assumption. Bank corrections are clipped at the source maximum. The present run stops at 720 degrees or the minimum-height boundary and does not yet propagate the full Recovery phase.

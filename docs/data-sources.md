@@ -347,3 +347,66 @@ unsupported
 ```
 
 These tags are part of the safety/traceability design, not cosmetic metadata.
+
+## 14. Sources verified for the initial implementation
+
+### 14.1 Training procedure
+
+Primary file inspected outside the repository:
+
+```text
+本文_改正19.pdf
+SHA-256: f00fea1903a235491e2079085bc0e65031497bd65d5ace2b471e19d00f96e0e8
+```
+
+The PDF revision table identifies 改正19, effective 2026-06-24. The implementation transcribes these locations:
+
+| Role | Source page | PDF page | Page date |
+|---|---:|---:|---:|
+| Chapter 5 safety / minimum training height | 5-(1) | 124 | 2026-03-02 |
+| Spiral Descent wind, clearing, entry | 5-(34) | 157 | 2020-12-16 |
+| Spiral Descent execution, 720°, recovery | 5-(35) | 158 | 2020-12-16 |
+| Chapter 5 advisory Reference Data | 5-(49) | 172 | 2023-07-06 |
+
+The source contains Gear actions. They remain visible in the citation notes and advisory raw value, but do not become a dynamic Gear input/state for the fixed-gear target model.
+
+### 14.2 Approved SR22 performance data
+
+Primary file inspected outside the repository:
+
+```text
+SR22_G6_型式証明飛行規程(R5.8.28)全章.pdf
+P/N 13772-006J
+approval/effective date shown: 2023-08-28
+SHA-256: 2a3ff005f213df01c55d5cfd7b3cbc6172037c89db60eb70700526e280949ac4
+```
+
+The initial canonical package data is a verified 2D slice of Cruise Performance p.5-32 (PDF page 192):
+
+```text
+fixed applicability: 2,000 ft pressure altitude, 2,500 RPM, 3,400 lb, no wind
+axes:                MAP [inHg] x ISA deviation [degC]
+outputs:             PWR [%], KTAS [kt], fuel flow [US gal/h]
+```
+
+The three dependent quantities are stored in separate immutable JSON tables under `src/sr22_course_simulator/data/poh/canonical/`. The printed rows were reordered from descending to ascending MAP with matching dependent-value reordering; that transformation is recorded in each citation. Canonical volumetric fuel flow remains GPH—no hidden fuel-density conversion is applied.
+
+The printed POH note says to subtract 10 KTAS with the nose-wheel pant/fairing removed. The canonical table retains the printed baseline. Target-configuration correction is a separate sourced transformation and must never alter canonical values.
+
+The current Chapter 5 has no descent-performance table covering 110 kt, approximately 10% Power, and 45–55 degrees Bank. Cruise data at 3,400 lb cannot be repurposed into a weight correction or arbitrary Spiral Descent response surface.
+
+## 15. Canonical JSON schema
+
+The strict version-1 loader requires:
+
+```text
+schema_version
+table_id
+axes[]: name, unit, strictly increasing values
+output: name, unit
+flat row-major values (last axis fastest)
+citation: document/revision/date/chapter/section/page/table/extraction/transformations
+applicability: aircraft/configuration/conditions
+```
+
+It rejects duplicate JSON keys, unknown fields, sparse/ragged grids, non-finite values, duplicate/descending axes and shape mismatch. Query coordinates must match the axis set exactly. Source endpoints are inclusive; any request outside the source domain raises structured `OutOfDomainError`. There is deliberately no extrapolation switch.

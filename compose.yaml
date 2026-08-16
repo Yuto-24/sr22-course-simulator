@@ -1,0 +1,26 @@
+name: sr22-course-simulator
+
+x-build-args: &build-args
+  PYTHON_VERSION: "${PYTHON_VERSION:-3.12}"
+  APP_UID: "${LOCAL_UID:-1000}"
+  APP_GID: "${LOCAL_GID:-1000}"
+
+services:
+  simulator:
+    image: sr22-course-simulator:local
+    build:
+      context: .
+      target: runtime
+      args: *build-args
+    command: ["--mode", "guided", "--kml", "/output/guided-spiral.kml"]
+    volumes:
+      - type: bind
+        source: ./artifacts
+        target: /output
+
+  test:
+    image: sr22-course-simulator:test
+    build:
+      context: .
+      target: test
+      args: *build-args

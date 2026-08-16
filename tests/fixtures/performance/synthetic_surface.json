@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "table_id": "synthetic.multi_affine_3d",
+  "axes": [
+    {
+      "name": "x",
+      "unit": "x-unit",
+      "values": [0.0, 2.0, 5.0]
+    },
+    {
+      "name": "y",
+      "unit": "y-unit",
+      "values": [-1.0, 4.0]
+    },
+    {
+      "name": "z",
+      "unit": "z-unit",
+      "values": [10.0, 30.0]
+    }
+  ],
+  "output": {
+    "name": "synthetic_output",
+    "unit": "output-unit"
+  },
+  "values": [
+    14.5,
+    23.5,
+    2.0,
+    16.0,
+    15.8,
+    20.4,
+    6.8,
+    18.4,
+    17.75,
+    15.75,
+    14.0,
+    22.0
+  ],
+  "citation": {
+    "document_title": "Synthetic deterministic performance fixture",
+    "revision": "1",
+    "effective_date": "2026-08-16",
+    "chapter": "test",
+    "section": "multi-affine surface",
+    "page": "1",
+    "table": "fixture-1",
+    "extraction_method": "hand-authored from the documented test formula",
+    "transformations": [
+      "flattened in row-major order with the final axis varying fastest"
+    ],
+    "notes": [
+      "Not aircraft performance data"
+    ]
+  },
+  "applicability": {
+    "aircraft_model": "synthetic-test-only",
+    "configuration": [
+      {
+        "name": "fixture_kind",
+        "value": "multi-affine"
+      }
+    ],
+    "conditions": [
+      "Deterministic interpolation tests only"
+    ]
+  }
+}
