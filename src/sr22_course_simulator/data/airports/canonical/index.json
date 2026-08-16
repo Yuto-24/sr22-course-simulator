@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-08-16",
+  "description": "Static AIP Japan aerodrome/runway master data extracted from the eight supplied airport PDFs. Training-school traffic-pattern geometry is intentionally not included in this AIP layer.",
+  "conventions": {
+    "coordinates": "AIP-published latitude/longitude; raw compact DMS and decimal degrees are both retained.",
+    "bearing": "Runway geometry uses AIP TRUE BRG. Magnetic variation is stored separately and is not used to construct geometry.",
+    "magnetic_variation_sign": "East positive, West negative.",
+    "annual_change_sign": "Eastward annual change positive, Westward annual change negative.",
+    "null_semantics": "null means not stated in the extracted source field; values are not inferred."
+  },
+  "source_scope": {
+    "included": [
+      "AD 2.2 aerodrome geographical and administrative data",
+      "AD 2.12 runway physical characteristics",
+      "AD 2.13 declared distances",
+      "RJFT local VFR/traffic-pattern restrictions explicitly stated in the supplied AIP"
+    ],
+    "excluded": [
+      "instrument procedures",
+      "lighting details",
+      "obstacle data",
+      "frequencies",
+      "chart-digitized traffic-circuit geometry",
+      "Aviation College-specific traffic-pattern geometry"
+    ]
+  },
+  "airports": [
+    "RJFC",
+    "RJFG",
+    "RJFK",
+    "RJFM",
+    "RJFO",
+    "RJFS",
+    "RJFT",
+    "RJFU"
+  ]
+}
