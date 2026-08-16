@@ -42,13 +42,13 @@ TRAJECTORY_CSV_FIELDS = (
 
 
 def trajectory_to_csv(trajectory: Trajectory) -> str:
-    """Serialize all trajectory states to CSV with values expressed in the units specified by the column names.
-    
+    """Serialize trajectory states using the units named by each CSV column.
+
     Parameters:
-    	trajectory (Trajectory): Trajectory whose states are serialized.
-    
+        trajectory (Trajectory): Trajectory whose states are serialized.
+
     Returns:
-    	str: CSV text containing a header and one row for each trajectory state.
+        str: CSV text containing a header and one row for each trajectory state.
     """
 
     stream = StringIO(newline="")

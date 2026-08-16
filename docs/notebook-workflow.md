@@ -98,10 +98,20 @@ docker compose up notebook
 
 Python 3.11 以上を用意し、repository root で実行します。
 
+Linux / macOS:
+
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -e '.[notebook]'
 .venv/bin/python -m jupyter lab --ServerApp.root_dir=notebooks
+```
+
+Windows PowerShell:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[notebook]"
+.\.venv\Scripts\python.exe -m jupyter lab --ServerApp.root_dir=notebooks
 ```
 
 Notebook の既定出力先は repository の `artifacts/` です。`SR22_ARTIFACT_DIR` を設定した場合はその path を使用します。
@@ -132,8 +142,18 @@ docker compose run --rm test
 
 別の localhost port を指定します。
 
+Linux / macOS:
+
 ```bash
 JUPYTER_PORT=8890 docker compose up notebook
+```
+
+Windows PowerShell:
+
+```powershell
+$env:JUPYTER_PORT = "8890"
+docker compose up notebook
+Remove-Item Env:JUPYTER_PORT
 ```
 
 この場合、URL は `http://127.0.0.1:8890/lab?token=...` です。

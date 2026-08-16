@@ -29,7 +29,8 @@ FROM base AS test
 
 COPY --chown=simulator:simulator tests/ ./tests/
 COPY --chown=simulator:simulator notebooks/ ./notebooks/
-COPY --chown=simulator:simulator Dockerfile compose.yaml pyproject.toml ./
+COPY --chown=simulator:simulator docs/ ./docs/
+COPY --chown=simulator:simulator Dockerfile README.md compose.yaml pyproject.toml ./
 
 CMD ["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"]
 
@@ -41,7 +42,10 @@ COPY pyproject.toml README.md ./
 
 RUN python -m pip install --no-cache-dir ".[notebook]" \
     && mkdir -p /workspace/notebooks /output \
-    && chown -R simulator:simulator /workspace /output
+        /tmp/simulator-home /tmp/ipython /tmp/jupyter/config \
+        /tmp/jupyter/data /tmp/jupyter/runtime /tmp/matplotlib \
+    && chown -R simulator:simulator /workspace /output \
+        /tmp/simulator-home /tmp/ipython /tmp/jupyter /tmp/matplotlib
 
 ENV HOME=/tmp/simulator-home \
     IPYTHONDIR=/tmp/ipython \

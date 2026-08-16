@@ -20,9 +20,10 @@ class ContainerPythonVersionContractTests(unittest.TestCase):
         self.assertIn("actual < minimum", dockerfile)
         self.assertIn("this project requires Python >= 3.11", dockerfile)
         self.assertIn(
-            "COPY --chown=simulator:simulator Dockerfile compose.yaml pyproject.toml ./",
+            "COPY --chown=simulator:simulator Dockerfile README.md compose.yaml pyproject.toml ./",
             dockerfile,
         )
+        self.assertIn("COPY --chown=simulator:simulator docs/ ./docs/", dockerfile)
         self.assertIn("COPY --chown=simulator:simulator notebooks/ ./notebooks/", dockerfile)
 
     def test_compose_default_version_satisfies_project_lower_bound(self) -> None:
@@ -53,6 +54,16 @@ class ContainerPythonVersionContractTests(unittest.TestCase):
         self.assertIn('"jupyterlab>=4.4,<5"', pyproject)
         self.assertIn('"nbconvert>=7.16"', pyproject)
         self.assertIn('python -m pip install --no-cache-dir ".[notebook]"', notebook_stage)
+        for runtime_directory in (
+            "/tmp/simulator-home",
+            "/tmp/ipython",
+            "/tmp/jupyter/config",
+            "/tmp/jupyter/data",
+            "/tmp/jupyter/runtime",
+            "/tmp/matplotlib",
+        ):
+            self.assertIn(runtime_directory, notebook_stage)
+        self.assertIn("/tmp/simulator-home /tmp/ipython /tmp/jupyter /tmp/matplotlib", notebook_stage)
         self.assertIn("USER simulator", notebook_stage)
         self.assertIn("EXPOSE 8888", notebook_stage)
 

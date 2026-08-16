@@ -272,10 +272,20 @@ PDF 自体は repository に含めません。
 
 ## ローカルで Notebook を使う
 
+Linux / macOS:
+
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -e '.[notebook]'
 .venv/bin/python -m jupyter lab --ServerApp.root_dir=notebooks
+```
+
+Windows PowerShell:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[notebook]"
+.\.venv\Scripts\python.exe -m jupyter lab --ServerApp.root_dir=notebooks
 ```
 
 表示された URL を開きます。Notebook の既定出力先は repository の `artifacts/` です。
@@ -297,9 +307,18 @@ docker compose run --rm test
 
 Guidance demo を実行し、KML を `artifacts/guided-spiral.kml` に保存します。
 
+Linux / macOS:
+
 ```bash
 mkdir -p artifacts
 LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose run --rm simulator
+```
+
+Windows PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force artifacts | Out-Null
+docker compose run --rm simulator
 ```
 
 ローカル install 後は同じ demo を直接実行できます。出力は assumption-dependent であり、POH-validated descent prediction ではありません。

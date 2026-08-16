@@ -59,9 +59,13 @@ class NotebookContractTests(unittest.TestCase):
         )
         self.assertIn("spiral_descent_package()", code)
         self.assertIn("maneuver_spec.termination_conditions", code)
+        self.assertIn('item.value is not None', code)
+        self.assertIn('if completion.unit != "deg":', code)
         self.assertNotIn("target_turns", code)
+        self.assertNotIn("AccumulatedTurn", code)
         self.assertIn("PylonSpiralPath(", code)
         self.assertIn("reference_path=reference_path", code)
+        self.assertIn("termination=None", code)
         self.assertIn("write_trajectory_csv(", code)
         self.assertIn("trajectory_to_kml(", code)
         self.assertIn("reference_path_to_kml(", code)
@@ -76,6 +80,18 @@ class NotebookContractTests(unittest.TestCase):
             self.assertIsNone(cell["execution_count"])
             self.assertEqual(cell["outputs"], [])
             compile("".join(cell["source"]), f"notebook-cell-{index}", "exec")
+
+    def test_documentation_covers_windows_powershell_workflows(self) -> None:
+        """Verify that Windows users do not have to translate POSIX-only commands."""
+
+        readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+        workflow = (REPOSITORY_ROOT / "docs" / "notebook-workflow.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(r".\.venv\Scripts\python.exe", readme)
+        self.assertIn("New-Item -ItemType Directory -Force artifacts", readme)
+        self.assertIn(r".\.venv\Scripts\python.exe", workflow)
+        self.assertIn('$env:JUPYTER_PORT = "8890"', workflow)
 
 
 if __name__ == "__main__":
