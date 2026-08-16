@@ -23,6 +23,7 @@ class ContainerPythonVersionContractTests(unittest.TestCase):
             "COPY --chown=simulator:simulator Dockerfile compose.yaml pyproject.toml ./",
             dockerfile,
         )
+        self.assertIn("COPY --chown=simulator:simulator notebooks/ ./notebooks/", dockerfile)
 
     def test_compose_default_version_satisfies_project_lower_bound(self) -> None:
         compose = (REPOSITORY_ROOT / "compose.yaml").read_text(encoding="utf-8")
@@ -40,6 +41,31 @@ class ContainerPythonVersionContractTests(unittest.TestCase):
         pyproject = (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
         self.assertIn('requires-python = ">=3.11"', pyproject)
+
+    def test_notebook_image_uses_declared_extra_and_non_root_runtime(self) -> None:
+        dockerfile = (REPOSITORY_ROOT / "Dockerfile").read_text(encoding="utf-8")
+        pyproject = (REPOSITORY_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+        notebook_stage = dockerfile.split("FROM base AS notebook", maxsplit=1)[1].split(
+            "FROM base AS runtime", maxsplit=1
+        )[0]
+        self.assertIn('notebook = [', pyproject)
+        self.assertIn('"jupyterlab>=4.4,<5"', pyproject)
+        self.assertIn('"nbconvert>=7.16"', pyproject)
+        self.assertIn('python -m pip install --no-cache-dir ".[notebook]"', notebook_stage)
+        self.assertIn("USER simulator", notebook_stage)
+        self.assertIn("EXPOSE 8888", notebook_stage)
+
+    def test_compose_notebook_persists_notebook_and_artifacts(self) -> None:
+        compose = (REPOSITORY_ROOT / "compose.yaml").read_text(encoding="utf-8")
+
+        self.assertIn("target: notebook", compose)
+        self.assertIn('"127.0.0.1:${JUPYTER_PORT:-8888}:8888"', compose)
+        self.assertIn("source: ./notebooks", compose)
+        self.assertIn("target: /workspace/notebooks", compose)
+        self.assertIn("source: ./artifacts", compose)
+        self.assertIn("target: /output", compose)
+        self.assertIn("SR22_ARTIFACT_DIR: /output", compose)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,25 @@ x-build-args: &build-args
   APP_GID: "${LOCAL_GID:-1000}"
 
 services:
+  notebook:
+    image: sr22-course-simulator:notebook
+    build:
+      context: .
+      target: notebook
+      args: *build-args
+    init: true
+    environment:
+      SR22_ARTIFACT_DIR: /output
+    ports:
+      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"
+    volumes:
+      - type: bind
+        source: ./notebooks
+        target: /workspace/notebooks
+      - type: bind
+        source: ./artifacts
+        target: /output
+
   simulator:
     image: sr22-course-simulator:local
     build:

@@ -4,6 +4,48 @@ Cirrus SR22 を対象に、航空大学校の訓練で扱う飛行経路・飛�
 
 このプロジェクトは、完全な 6-DoF Flight Dynamics Simulator を再現することを主目的にしません。訓練で直接扱う `Pitch`、`Bank`、`PWR`、`Flap`、学生訓練実施要領の本文に規定された課目の目的・諸元・修正要領、SR22 飛行規程第 5 章の性能データを組み合わせる **performance-based / quasi-steady simulator** を目指します。
 
+## まず Notebook で動かす
+
+Docker が使える Linux では、repository root で次を実行します。
+
+```bash
+mkdir -p artifacts
+LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose up --build notebook
+```
+
+Windows / macOS の Docker Desktop では `LOCAL_UID` / `LOCAL_GID` を省略します。
+
+```bash
+docker compose up --build notebook
+```
+
+Terminal に表示された `http://127.0.0.1:8888/lab?token=...` をブラウザで開き、`spiral_descent_walkthrough.ipynb` を選びます。Notebook の `### 2. 初期状態・風・明示的な仮定を入力する` で条件を編集し、上から順に実行してください。
+
+結果は repository の `artifacts/` に保存されます。
+
+```text
+artifacts/
+├─ guided-trajectory.csv       各時刻の状態量と根拠ラベル
+├─ guided-trajectory.kml       風の影響を受けた実軌跡
+├─ guided-reference-path.kml   風と独立した基準経路
+├─ guided-ground-track.png     平面経路
+├─ guided-altitude-time.png    高度の時系列
+└─ guided-trajectory-3d.png    3 次元表示
+```
+
+Notebook の編集内容は `notebooks/spiral_descent_walkthrough.ipynb` に保存されます。生成物を入れる `artifacts/` は Git 管理対象外です。詳しい手順とトラブルシューティングは [Notebook Workflow](docs/notebook-workflow.md) を参照してください。
+
+## どこを編集・確認するか
+
+| 目的 | 場所 | 保存先 / 反映方法 |
+| --- | --- | --- |
+| 初期状態、風、明示的な仮定を変えて試す | `notebooks/spiral_descent_walkthrough.ipynb` の parameter cell | Notebook の表示と `artifacts/` |
+| 課目本文由来の意味を確認・修正する | `src/sr22_course_simulator/maneuver/` | test 後に image を再 build |
+| 機体応答・積分処理を変更する | `src/sr22_course_simulator/aircraft/`、`simulation/`、`guidance/` | test 後に image を再 build |
+| POH の canonical data を追加する | `src/sr22_course_simulator/data/poh/canonical/` | node 再現・範囲外拒否 test を追加 |
+| 数値の時系列を確認する | `artifacts/guided-trajectory.csv` | 単位は列名に明記 |
+| 3D 経路を確認する | `artifacts/*.kml` | Reference Path と Trajectory は別ファイル |
+
 ## 目的
 
 主に次を扱います。
@@ -196,6 +238,7 @@ POH の補間から得られる性能値と、学訓本文の Target / Control R
 - [Maneuver Specification](docs/maneuver-specification.md)
 - [Data Sources and Interpolation](docs/data-sources.md)
 - [Validation](docs/validation.md)
+- [Notebook Workflow](docs/notebook-workflow.md)
 - [Roadmap](docs/roadmap.md)
 - [Agent Rules](AGENTS.md)
 
@@ -212,7 +255,7 @@ POH の補間から得られる性能値と、学訓本文の Target / Control R
 - direct-input Forward Simulation と、別 API の Spiral Descent Guidance Simulation
 - wind-independent `ReferencePath` と time-indexed `Trajectory`
 - 2D Ground Track、Altitude-Time、3D plot helper（Matplotlib は optional）
-- Trajectory / Reference Path の KML 3D LineString export
+- Trajectory の CSV export、Trajectory / Reference Path の KML 3D LineString export
 
 ### Source coverage
 
@@ -227,44 +270,39 @@ PDF 自体は repository に含めません。
 
 重要な model gap として、確認した POH Chapter 5 には 110 kt / 約 10% PWR / Bank 45〜55° の Spiral Descent を定義する descent performance table がありません。したがって package はこの領域を source-backed SR22 performance として扱いません。実行例は caller-supplied の `AssumedSteadyPointProvider` と固定迎角 closure を使用し、すべて `assumed` として明示します。
 
-## Install / Test
+## ローカルで Notebook を使う
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e '.[notebook]'
+.venv/bin/python -m jupyter lab --ServerApp.root_dir=notebooks
+```
+
+表示された URL を開きます。Notebook の既定出力先は repository の `artifacts/` です。
+
+## Test
 
 ```bash
 python3 -m pip install -e .
 python3 -m unittest discover -s tests -v
 ```
 
-Plot helper も使う場合:
-
-```bash
-python3 -m pip install -e '.[plot]'
-```
-
-## Docker
-
-実行環境は標準ライブラリだけで完結するため、Docker image は `python:3.12-slim-bookworm` を基礎にし、package source と canonical POH JSON だけを収容します。ホスト側に Python や追加 package は不要です。
-
-Guidance demo を実行し、KML を `artifacts/guided-spiral.kml` に保存します。
-
-```bash
-mkdir -p artifacts
-LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose build
-LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose run --rm simulator
-```
-
-Windows / macOS の Docker Desktop では `LOCAL_UID` / `LOCAL_GID` を省略できます。
-
-同一 Dockerfile の test target で全回帰テストを実行します。
+Docker の test target で実行する場合:
 
 ```bash
 docker compose run --rm test
 ```
 
-`PYTHON_VERSION`、`LOCAL_UID`、`LOCAL_GID` は build args / Compose 環境変数として上書き可能です。`PYTHON_VERSION` が解決する interpreter は Python 3.11 以上でなければならず、それ未満では image build が明示的に失敗します。Container は非 root user で動作し、PDF 原資料や Matplotlib を runtime image に含めません。
+## 1 回だけ CLI で実行する
 
-## 実行例
+Guidance demo を実行し、KML を `artifacts/guided-spiral.kml` に保存します。
 
-Guidance simulation（出力は assumption-dependent であり、POH-validated descent prediction ではありません）:
+```bash
+mkdir -p artifacts
+LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose run --rm simulator
+```
+
+ローカル install 後は同じ demo を直接実行できます。出力は assumption-dependent であり、POH-validated descent prediction ではありません。
 
 ```bash
 sr22-spiral-demo --mode guided --kml artifacts/guided-spiral.kml
@@ -277,3 +315,5 @@ sr22-spiral-demo --mode forward --calm --kml artifacts/forward-spiral.kml
 ```
 
 Python API では `simulate_forward(...)` は ManeuverSpec を受け取らず、`simulate_guided_spiral_descent(...)` は narrative-derived `ManeuverSpec` と別オブジェクトの `PylonSpiralPath` を受け取ります。この分離により、固定入力実験を公式課目の再現として誤表示しません。
+
+`PYTHON_VERSION`、`LOCAL_UID`、`LOCAL_GID`、`JUPYTER_PORT` は Compose の環境変数として上書き可能です。`PYTHON_VERSION` が解決する interpreter は Python 3.11 以上でなければならず、それ未満では image build が明示的に失敗します。Container は非 root user で動作し、PDF 原資料を image に含めません。Matplotlib / Jupyter は notebook image にだけ含め、CLI runtime image には含めません。

@@ -28,9 +28,34 @@ USER simulator
 FROM base AS test
 
 COPY --chown=simulator:simulator tests/ ./tests/
+COPY --chown=simulator:simulator notebooks/ ./notebooks/
 COPY --chown=simulator:simulator Dockerfile compose.yaml pyproject.toml ./
 
 CMD ["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"]
+
+FROM base AS notebook
+
+USER root
+
+COPY pyproject.toml README.md ./
+
+RUN python -m pip install --no-cache-dir ".[notebook]" \
+    && mkdir -p /workspace/notebooks /output \
+    && chown -R simulator:simulator /workspace /output
+
+ENV HOME=/tmp/simulator-home \
+    IPYTHONDIR=/tmp/ipython \
+    JUPYTER_CONFIG_DIR=/tmp/jupyter/config \
+    JUPYTER_DATA_DIR=/tmp/jupyter/data \
+    JUPYTER_RUNTIME_DIR=/tmp/jupyter/runtime \
+    MPLCONFIGDIR=/tmp/matplotlib
+
+WORKDIR /workspace/notebooks
+USER simulator
+
+EXPOSE 8888
+
+CMD ["python", "-m", "jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--ServerApp.root_dir=/workspace/notebooks"]
 
 FROM base AS runtime
 
