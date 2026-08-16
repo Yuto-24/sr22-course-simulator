@@ -204,7 +204,7 @@ class _ConstantAssumptionResponseModel:
         Provide a fixed synthetic quasi-steady aircraft response for testing.
         
         Returns:
-            QuasiSteadyResponse: A response representing 110 kt true airspeed, a −2° flight-path angle, and an assumed model result.
+            QuasiSteadyResponse: A response representing 110 kt true airspeed, a -2° flight-path angle, and an assumed model result.
         """
         return QuasiSteadyResponse(
             true_airspeed_mps=knots_to_metres_per_second(110.0),
