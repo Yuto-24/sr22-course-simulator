@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import csv
+from dataclasses import replace
+from io import StringIO
 import math
 import tempfile
 from pathlib import Path
@@ -9,10 +12,17 @@ from xml.etree import ElementTree as ET
 
 from sr22_course_simulator.aircraft import AircraftState, FlapSetting, GeoPosition
 from sr22_course_simulator.environment import ConstantWind, NoWind
-from sr22_course_simulator.export import reference_path_to_kml, trajectory_to_kml, write_kml
+from sr22_course_simulator.export import (
+    reference_path_to_kml,
+    trajectory_to_csv,
+    trajectory_to_kml,
+    write_kml,
+    write_trajectory_csv,
+)
 from sr22_course_simulator.geometry import distance_m, displace_position
 from sr22_course_simulator.path import PathPoint, PolylineReferencePath, PylonSpiralPath
 from sr22_course_simulator.plotting import plots as plotting_plots
+from sr22_course_simulator.provenance import EvidenceKind
 from sr22_course_simulator.simulation import Trajectory
 
 
@@ -166,6 +176,47 @@ class KmlTests(unittest.TestCase):
             returned = write_kml(content, destination)
             self.assertEqual(returned, destination)
             self.assertEqual(destination.read_text(encoding="utf-8"), content)
+
+
+class CsvTests(unittest.TestCase):
+    def test_trajectory_csv_has_explicit_units_and_state_order(self) -> None:
+        trajectory = Trajectory(
+            (
+                replace(
+                    _state(0.0, GeoPosition(35.0, 135.0), 1_000.0),
+                    evidence=(EvidenceKind.ASSUMED, EvidenceKind.PHYSICS_DERIVED),
+                ),
+                _state(2.0, GeoPosition(35.1, 135.2), 900.0),
+            )
+        )
+
+        rows = list(csv.DictReader(StringIO(trajectory_to_csv(trajectory))))
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["time_s"], "0.0")
+        self.assertEqual(rows[1]["latitude_deg"], "35.1")
+        self.assertEqual(rows[1]["longitude_deg"], "135.2")
+        self.assertAlmostEqual(float(rows[0]["altitude_ft"]), 3_280.839895, places=5)
+        self.assertAlmostEqual(float(rows[0]["true_airspeed_kt"]), 97.1922246, places=5)
+        self.assertEqual(rows[0]["flap"], FlapSetting.RETRACTED.value)
+        self.assertEqual(rows[0]["evidence"], "assumed;physics_derived")
+
+    def test_write_trajectory_csv_creates_parent_directory(self) -> None:
+        trajectory = Trajectory(
+            (
+                _state(0.0, GeoPosition(1.0, 2.0), 3.0),
+                _state(1.0, GeoPosition(1.1, 2.1), 4.0),
+            )
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "nested" / "trajectory.csv"
+            returned = write_trajectory_csv(trajectory, destination)
+
+            self.assertEqual(returned, destination)
+            self.assertEqual(
+                destination.read_bytes().decode("utf-8"),
+                trajectory_to_csv(trajectory),
+            )
 
 
 class _RecordingAxes:
