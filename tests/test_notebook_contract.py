@@ -12,6 +12,9 @@ NOTEBOOK_PATH = REPOSITORY_ROOT / "notebooks" / "spiral_descent_walkthrough.ipyn
 class NotebookContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
+        """
+        Load the notebook definition and its cells for the test class.
+        """
         cls.notebook = json.loads(NOTEBOOK_PATH.read_text(encoding="utf-8"))
         cls.cells = cls.notebook["cells"]
 
@@ -66,6 +69,7 @@ class NotebookContractTests(unittest.TestCase):
         self.assertIn('artifact_dir / "guided-reference-path.kml"', code)
 
     def test_committed_notebook_is_clean_and_all_code_cells_compile(self) -> None:
+        """Verify that all notebook code cells are unexecuted, contain no outputs, and compile successfully."""
         for index, cell in enumerate(self.cells):
             if cell["cell_type"] != "code":
                 continue
