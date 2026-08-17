@@ -17,6 +17,7 @@ from sr22_course_simulator.units import wrap_radians_2pi
 class PathPoint:
     position: GeoPosition
     altitude_m: float
+    label: str | None = None
 
     def __post_init__(self) -> None:
         """
@@ -27,6 +28,10 @@ class PathPoint:
         """
         if not math.isfinite(float(self.altitude_m)):
             raise ValidationError("path-point altitude must be finite")
+        if self.label is not None and (
+            not isinstance(self.label, str) or not self.label.strip()
+        ):
+            raise ValidationError("path-point label must not be empty when provided")
 
 
 @runtime_checkable

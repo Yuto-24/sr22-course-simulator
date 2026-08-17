@@ -7,6 +7,12 @@ from sr22_course_simulator.path.reference import (
     PylonSpiralPath,
     ReferencePath,
 )
+from sr22_course_simulator.path.traffic_pattern import (
+    PatternLabel,
+    PatternSide,
+    TrafficPatternSpec,
+    generate_traffic_pattern,
+)
 
 __all__ = [
     "PathPoint",
@@ -14,4 +20,8 @@ __all__ = [
     "PolylineReferencePath",
     "PylonSpiralPath",
     "ReferencePath",
+    "PatternLabel",
+    "PatternSide",
+    "TrafficPatternSpec",
+    "generate_traffic_pattern",
 ]

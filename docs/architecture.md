@@ -208,6 +208,23 @@ Permitted uses:
 - sanity checking;
 - source traceability.
 
+### `AirportSpec` / `RunwaySpec`
+
+`AirportSpec` keeps AIP-derived airport metadata, a reference-only ARP,
+Magnetic Variation and directional runway records. `RunwaySpec` keeps both
+thresholds, threshold elevations, dimensions, True Bearing and source
+provenance.
+
+The ARP is not a runway-geometry origin. Every runway computes:
+
+```text
+RWY Center Point = (threshold_a + threshold_b) / 2
+```
+
+Runway vectors and left/right normals use the directional True Bearing. The
+reciprocal direction reverses the threshold roles and runway vector while
+retaining the same computed center point.
+
 ### `ReferencePath`
 
 A geometric 2D/3D path independent of wind.
@@ -359,6 +376,11 @@ Angles in numerical routines should be radians unless explicitly documented othe
 
 Track / heading calculations must clearly state True vs Magnetic reference. Core physical simulation should prefer True reference; magnetic conversion belongs in navigation/interface logic.
 
+Airport Reference Points are reference-only. Airport traffic-pattern geometry
+uses the applicable RWY Center Point, source-backed True Bearing and SI
+along-runway/lateral displacements. Magnetic Variation is not used to place KML
+coordinates.
+
 ## 7. SR22 target configuration assumptions
 
 For current project scope:
@@ -377,6 +399,8 @@ Any performance effect associated with wheel-fairing configuration must come fro
 
 ```text
 src/sr22_course_simulator/
+├── airport/
+│   └── spec.py
 ├── aircraft/
 │   ├── state.py
 │   ├── input.py
@@ -441,21 +465,23 @@ This is a design target. Do not create empty modules/directories before they hav
 
 ## 9. Initial implementation mapping
 
-The first package implementation follows the domain-oriented layout above, but creates only modules exercised by the current Spiral Descent work:
+The package follows the domain-oriented layout above and creates modules only when exercised by implemented workflows:
 
 ```text
 aircraft       FlightInput, loading/fuel, InitialState/AircraftState, response protocols
 environment    atmosphere, terrain and polymorphic wind providers
 performance    canonical tables, loader, interpolation, POH cruise query
 maneuver       source-semantic ManeuverSpec and separate AdvisoryReference
-path           wind-independent PylonSpiralPath / polyline geometry
+airport        AirportSpec / RunwaySpec, DMS parsing and RWY Center Point
+data/airports  canonical RJFM AIP transcription
+path           wind-independent pylon, polyline and traffic-pattern geometry
 guidance       wind triangle and bounded Spiral Descent guidance
 simulation     analytical mechanics, termination, forward integrator, Trajectory
-export         KML for ReferencePath and Trajectory
+export         single/multi-placemark KML for ReferencePath and Trajectory
 plotting       optional object-based 2D/altitude/3D views
 ```
 
-There are intentionally no empty `nav`, traffic-pattern, forecast-weather, sideslip, Rudder, Gear-dynamics or 6-DoF modules.
+There are intentionally no empty `nav`, forecast-weather, sideslip, Rudder, Gear-dynamics or 6-DoF modules.
 
 ### 9.1 Forward versus guided entry points
 

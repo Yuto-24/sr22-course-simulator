@@ -51,6 +51,15 @@ Airport-specific procedures, Aviation College operating procedures, airspace rul
 
 Do not infer a local traffic pattern or local rule from generic aviation knowledge when an applicable source exists.
 
+AIP airport/runway data and local pattern rules have different roles. AIP data
+defines ARP metadata, thresholds, runway dimensions, elevations, True Bearing
+and Magnetic Variation. The applicable operating material defines pattern
+altitude and leg dimensions. Derived center points, runway vectors and normals
+must be deterministic geometry rather than separately transcribed coordinates.
+
+ARP is retained for reference and checks only. Runway and traffic-pattern
+geometry uses the midpoint of the two source thresholds as RWY Center Point.
+
 ### 2.4 Analytical physics
 
 Use independently well-defined physics/geometry to connect source-backed quantities:
@@ -305,6 +314,7 @@ data/
 │   ├── metadata/
 │   └── derived/            # optional reproducible caches, never canonical
 └── airports/
+    ├── rjfm.py
     └── ...
 ```
 
@@ -394,6 +404,25 @@ The three dependent quantities are stored in separate immutable JSON tables unde
 The printed POH note says to subtract 10 KTAS with the nose-wheel pant/fairing removed. The canonical table retains the printed baseline. Target-configuration correction is a separate sourced transformation and must never alter canonical values.
 
 The current Chapter 5 has no descent-performance table covering 110 kt, approximately 10% Power, and 45–55 degrees Bank. Cruise data at 3,400 lb cannot be repurposed into a weight correction or arbitrary Spiral Descent response surface.
+
+### 14.3 RJFM airport and runway data
+
+The task supplied a transcription from `RJFM__20260301.pdf`, effective
+2026-03-01, for RJFM AD 2.2 and AD 2.12. The raw PDF was not present in the
+checkout or task attachment directory during implementation, so the canonical
+Python record explicitly says `task-provided transcription` rather than
+claiming independent PDF verification.
+
+The record includes ARP, airport elevation, Magnetic Variation and annual
+change, directional runway True Bearings, dimensions, threshold positions and
+threshold elevations. Compact DMS is parsed deterministically. RWY Center Point,
+measured threshold distance, runway vectors and normals are derived values and
+are not separately transcribed.
+
+The Aviation College operating-material values for 1000 ft MSL, 1.5 NM
+downwind offset and 1.2 NM base extension are kept in a separate
+`TrafficPatternSpec` source role. The 0.0 NM crosswind extension is labeled as
+an explicit task assumption.
 
 ## 15. Canonical JSON schema
 

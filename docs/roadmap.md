@@ -15,6 +15,10 @@ Completed in the first package version:
 - minimal Entry/Execution Spiral Descent guidance with bounded Bank/path/wind correction;
 - separate pylon Reference Path and simulated Trajectory;
 - KML and optional plotting helpers;
+- reusable Airport/Runway master data with ARP reference-only semantics and
+  threshold-derived RWY Center Point;
+- RJFM RWY09/RWY27 NORTH/SOUTH straight-segment Reference Paths, Notebook and
+  individual/combined KML export;
 - deterministic numerical/source-semantic tests.
 
 Still open before claiming source-backed SR22 Spiral Descent performance:
@@ -186,8 +190,12 @@ Do not add a maneuver merely by copying its Reference Data row.
 
 ### Airport traffic patterns
 
-- define runway geometry and training-specific Reference Paths from applicable source procedures;
-- export traffic-pattern KML;
+- [x] define reusable AIP-derived Airport/Runway master data and deterministic DMS ingestion;
+- [x] define RWY Center Point from reciprocal thresholds without using ARP as a geometry origin;
+- [x] implement RJFM RWY09/RWY27 NORTH/SOUTH straight-segment Reference Paths from supplied local dimensions;
+- [x] export four individual traffic-pattern KML files and one multi-Placemark KML;
+- [ ] transcribe and validate other target airports (RJFO, RJFK, RJFT, RJFS, RJFU, RJFG, RJFC);
+- [ ] add curved turns and source-backed turn geometry when required;
 - generate wind-corrected guidance required to maintain the same ground path;
 - support airport-specific procedures as data rather than hard-coded special cases where practical;
 - keep path geometry separate from aircraft trajectory.

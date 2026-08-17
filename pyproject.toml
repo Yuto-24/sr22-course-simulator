@@ -23,6 +23,7 @@ dev = ["pytest>=8"]
 
 [project.scripts]
 sr22-spiral-demo = "sr22_course_simulator.examples.spiral_descent:main"
+sr22-rjfm-patterns = "sr22_course_simulator.examples.miyazaki_traffic_patterns:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
