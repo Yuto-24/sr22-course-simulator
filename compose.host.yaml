@@ -1,4 +1,5 @@
 services:
   notebook:
+    # compose.yaml requires JUPYTER_TOKEN even when host networking is selected.
     network_mode: host
-    ports: []
+    ports: !reset []

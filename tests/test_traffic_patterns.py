@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from itertools import pairwise
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -97,9 +98,13 @@ def _labeled_points(path):
 
 def _recovered_path_sweep_deg(spec, path) -> float:
     coordinates = tuple(_local_coordinates(spec, point) for point in path.points())
+    return _recovered_coordinate_sweep_deg(coordinates)
+
+
+def _recovered_coordinate_sweep_deg(coordinates) -> float:
     raw_headings = tuple(
         math.atan2(next_y - y, next_x - x)
-        for (x, y), (next_x, next_y) in zip(coordinates, coordinates[1:])
+        for (x, y), (next_x, next_y) in pairwise(coordinates)
     )
     unwrapped = [raw_headings[0]]
     for previous, current in zip(raw_headings, raw_headings[1:]):
@@ -640,7 +645,10 @@ class TrafficPatternGeometryTests(unittest.TestCase):
             make_270_before_base=False,
         ):
             components = generate_traffic_pattern_components(spec)
-            for location, heading in (("Downwind", math.pi / 2.0), ("Base", math.pi)):
+            for location, heading, bank_deg in (
+                ("Downwind", math.pi / 2.0, spec.downwind_turn_bank_deg),
+                ("Base", math.pi, spec.base_turn_bank_deg),
+            ):
                 circle = next(
                     path for path in components if path.name.endswith(f"Before {location} Circle")
                 )
@@ -687,12 +695,118 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                 )
                 profile = generate_coordinated_turn_profile(
                     true_airspeed_mps=knots_to_metres_per_second(spec.true_airspeed_kt),
-                    nominal_bank_deg=spec.downwind_turn_bank_deg,
+                    nominal_bank_deg=bank_deg,
                     roll_rate_deg_s=spec.roll_rate_deg_s,
                     signed_sweep_deg=-360.0,
                     sample_interval_s=spec.sample_interval_s,
                 )
                 self.assertEqual(len(circle.points()), len(profile.samples))
+
+    def test_circle_only_switches_generate_standalone_circles_and_legacy_turns(self) -> None:
+        for location in ("downwind", "base"):
+            with self.subTest(location=location):
+                spec = rjfm_traffic_pattern_specs(
+                    make_circle_before_downwind=location == "downwind",
+                    make_circle_middle_downwind=False,
+                    make_circle_before_base=location == "base",
+                    make_270_before_downwind=False,
+                    make_270_before_base=False,
+                )[0]
+                components = generate_traffic_pattern_components(spec)
+                component_names = tuple(path.name for path in components)
+                self.assertEqual(len(components), 2)
+                self.assertTrue(
+                    any(
+                        name.endswith(f"Before {location.title()} Circle")
+                        for name in component_names
+                    )
+                )
+                self.assertFalse(any(name.endswith("270") for name in component_names))
+
+                legacy_path = generate_traffic_pattern(spec)
+                legacy_labels = _labeled_points(legacy_path)
+                self.assertIn(f"before_{location}_turn_start", legacy_labels)
+                legacy_points = legacy_path.points()
+                indices = {
+                    point.label: index
+                    for index, point in enumerate(legacy_points)
+                    if point.label is not None
+                }
+                coordinates = tuple(
+                    _local_coordinates(spec, point)
+                    for point in legacy_points[
+                        indices[f"before_{location}_turn_start"] : indices[
+                            f"before_{location}_turn_end"
+                        ]
+                        + 1
+                    ]
+                )
+                self.assertAlmostEqual(
+                    _recovered_coordinate_sweep_deg(coordinates),
+                    -360.0,
+                    delta=0.1,
+                )
+
+    def test_location_specific_turn_banks_control_circle_and_270_profiles(self) -> None:
+        spec = rjfm_traffic_pattern_specs(
+            downwind_turn_bank_deg=20.0,
+            base_turn_bank_deg=24.0,
+            make_circle_before_downwind=True,
+            make_circle_middle_downwind=True,
+            make_circle_before_base=True,
+            make_270_before_downwind=True,
+            make_270_before_base=True,
+        )[0]
+        components = {path.name: path for path in generate_traffic_pattern_components(spec)}
+        expected_profiles = {
+            "Before Downwind Circle": generate_coordinated_turn_profile(
+                true_airspeed_mps=knots_to_metres_per_second(spec.true_airspeed_kt),
+                nominal_bank_deg=spec.downwind_turn_bank_deg,
+                roll_rate_deg_s=spec.roll_rate_deg_s,
+                signed_sweep_deg=-360.0,
+                sample_interval_s=spec.sample_interval_s,
+            ),
+            "Before Base Circle": generate_coordinated_turn_profile(
+                true_airspeed_mps=knots_to_metres_per_second(spec.true_airspeed_kt),
+                nominal_bank_deg=spec.base_turn_bank_deg,
+                roll_rate_deg_s=spec.roll_rate_deg_s,
+                signed_sweep_deg=-360.0,
+                sample_interval_s=spec.sample_interval_s,
+            ),
+        }
+        for suffix, profile in expected_profiles.items():
+            path = next(path for name, path in components.items() if name.endswith(suffix))
+            self.assertEqual(len(path.points()), len(profile.samples))
+
+        for location, bank_deg in (
+            ("Downwind", spec.downwind_turn_bank_deg),
+            ("Base", spec.base_turn_bank_deg),
+        ):
+            profile = generate_coordinated_turn_profile(
+                true_airspeed_mps=knots_to_metres_per_second(spec.true_airspeed_kt),
+                nominal_bank_deg=bank_deg,
+                roll_rate_deg_s=spec.roll_rate_deg_s,
+                signed_sweep_deg=-270.0,
+                sample_interval_s=spec.sample_interval_s,
+            )
+            path = next(
+                path
+                for name, path in components.items()
+                if name.endswith(f"Before {location} 270")
+            )
+            labels = _labeled_points(path)
+            start = next(
+                index
+                for index, point in enumerate(path.points())
+                if point.label == f"before_{location.lower()}_turn_start"
+            )
+            end = next(
+                index
+                for index, point in enumerate(path.points())
+                if point.label == f"before_{location.lower()}_turn_end"
+            )
+            self.assertEqual(end - start + 1, len(profile.samples))
+            self.assertIn(f"before_{location.lower()}_turn_start", labels)
 
     def test_270_components_connect_tangentially_and_apply_required_altitudes(self) -> None:
         for spec in rjfm_traffic_pattern_specs(
@@ -992,7 +1106,7 @@ class TrafficPatternGeometryTests(unittest.TestCase):
             end = _local_coordinates(spec, labels["middle_downwind_circle_complete"])
             self.assertAlmostEqual(start[1], 1.5 * 1_852.0, delta=0.3)
             self.assertAlmostEqual(end[1], 1.5 * 1_852.0, delta=0.3)
-            self.assertAlmostEqual(start[0] - end[0], 177.85035916, places=5)
+            self.assertAlmostEqual(start[0] - end[0], 127.62265661, places=5)
 
     def test_generated_turns_embed_required_sweeps_outside_axes_and_tangencies(self) -> None:
         """Check the sampled path, not only standalone turn-profile inputs."""
@@ -1009,6 +1123,7 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                     math.pi / 2.0,
                     -630.0,
                     "x_positive",
+                    spec.downwind_turn_bank_deg,
                 ),
                 (
                     "middle_downwind_turn_start",
@@ -1017,6 +1132,7 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                     math.pi,
                     -360.0,
                     "y_positive",
+                    spec.downwind_turn_bank_deg,
                 ),
                 (
                     "before_base_turn_start",
@@ -1025,12 +1141,21 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                     math.pi,
                     -270.0,
                     "x_negative",
+                    spec.base_turn_bank_deg,
                 ),
             )
-            for start_label, end_label, marker_label, heading, sweep, outside in expected_turns:
+            for (
+                start_label,
+                end_label,
+                marker_label,
+                heading,
+                sweep,
+                outside,
+                bank_deg,
+            ) in expected_turns:
                 profile = generate_coordinated_turn_profile(
                     true_airspeed_mps=speed,
-                    nominal_bank_deg=spec.normal_bank_deg,
+                    nominal_bank_deg=bank_deg,
                     roll_rate_deg_s=spec.roll_rate_deg_s,
                     signed_sweep_deg=sweep,
                     sample_interval_s=spec.sample_interval_s,
@@ -1081,7 +1206,7 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                     )
                     self.assertAlmostEqual(
                         abs(math.degrees(profile.samples[marker_offset].bank_rad)),
-                        spec.normal_bank_deg,
+                        bank_deg,
                         places=7,
                     )
 
@@ -1091,7 +1216,7 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                 _local_coordinates(spec, points[middle_end])[0]
                 - _local_coordinates(spec, points[middle_start])[0]
             )
-            self.assertAlmostEqual(middle_delta, -177.85035916, places=5)
+            self.assertAlmostEqual(middle_delta, -127.62265661, places=5)
 
     def test_representative_path_geometry_independently_recovers_turn_sweeps(self) -> None:
         """Recover turn behavior from generated coordinates without profile reuse."""

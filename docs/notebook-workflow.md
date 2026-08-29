@@ -24,31 +24,40 @@ Repository root で実行します。
 
 ```bash
 mkdir -p artifacts
-LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose up --build notebook
+JUPYTER_TOKEN="$(openssl rand -hex 32)" LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose up --build notebook
 ```
 
 `LOCAL_UID` / `LOCAL_GID` を container user に反映するため、Notebook と生成物をホスト側ユーザーで編集できます。
 
-### Windows / macOS
+### macOS
 
 Docker Desktop では UID / GID を指定せずに起動できます。
 
 ```bash
+JUPYTER_TOKEN="replace-with-a-strong-random-secret" docker compose up --build notebook
+```
+
+### Windows PowerShell
+
+```powershell
+$tokenBytes = [byte[]]::new(32)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($tokenBytes)
+$env:JUPYTER_TOKEN = [Convert]::ToHexString($tokenBytes)
 docker compose up --build notebook
 ```
 
 起動ログに次の形式の URL が表示されます。
 
 ```text
-http://127.0.0.1:8888/lab
+http://127.0.0.1:8888/lab?token=...
 ```
 
 URL を開き、`spiral_descent_walkthrough.ipynb` を選択します。終了時は起動した Terminal で `Ctrl+C` を押します。
 
 場周経路を生成する場合は、同じ JupyterLab で `miyazaki_traffic_patterns.ipynb` を選択して上から実行します。
 
-Compose は `JUPYTER_TOKEN` と `JUPYTER_PASSWORD` を指定しなければ認証なしで起動します。
-既定の `JUPYTER_HOST=0.0.0.0` は host の全interfaceへportをbindするため、LANへ到達可能な環境ではNotebookが露出します。localhostだけに限定する場合は `JUPYTER_HOST=127.0.0.1` を指定してください。認証する場合は、起動前に `JUPYTER_TOKEN` を設定します。
+Compose は強い非空の `JUPYTER_TOKEN` を必須にして起動します。未設定または空文字の場合、ComposeはNotebookを起動せずエラーにします。起動ログのURLにはtokenが含まれます。
+既定の `JUPYTER_HOST=0.0.0.0` はWindows hostからのアクセスを維持しますが、hostの全interfaceへportをbindします。localhostだけに限定する場合は `JUPYTER_HOST=127.0.0.1` を指定してください。LANまたは`compose.host.yaml`のhost-networkで公開する場合は、tokenだけに依存せずTLS終端済みreverse proxyの背後で運用してください。
 
 ## 条件を変えて実行する
 
@@ -152,22 +161,26 @@ docker compose run --rm test
 Linux / macOS:
 
 ```bash
-JUPYTER_PORT=8890 docker compose up notebook
+JUPYTER_TOKEN="$(openssl rand -hex 32)" JUPYTER_PORT=8890 docker compose up notebook
 ```
 
 Windows PowerShell:
 
 ```powershell
 $env:JUPYTER_PORT = "8890"
+$tokenBytes = [byte[]]::new(32)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($tokenBytes)
+$env:JUPYTER_TOKEN = [Convert]::ToHexString($tokenBytes)
 docker compose up notebook
 Remove-Item Env:JUPYTER_PORT
+Remove-Item Env:JUPYTER_TOKEN
 ```
 
-この場合、URL は `http://127.0.0.1:8890/lab` です。
+この場合、URL は `http://127.0.0.1:8890/lab?token=...` です。
 
 ### Token 付き URL が分からない
 
-`JUPYTER_TOKEN` を設定して起動した場合は、起動中の service log を表示します。
+起動中の service log を表示します。
 
 ```bash
 docker compose logs notebook

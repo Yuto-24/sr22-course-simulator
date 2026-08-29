@@ -20,7 +20,7 @@ class ContainerPythonVersionContractTests(unittest.TestCase):
         self.assertIn("actual < minimum", dockerfile)
         self.assertIn("this project requires Python >= 3.11", dockerfile)
         self.assertIn(
-            "COPY --chown=simulator:simulator Dockerfile README.md compose.yaml pyproject.toml ./",
+            "COPY --chown=simulator:simulator Dockerfile README.md compose.yaml compose.host.yaml pyproject.toml ./",
             dockerfile,
         )
         self.assertIn("COPY --chown=simulator:simulator docs/ ./docs/", dockerfile)
@@ -72,11 +72,24 @@ class ContainerPythonVersionContractTests(unittest.TestCase):
 
         self.assertIn("target: notebook", compose)
         self.assertIn('"${JUPYTER_HOST:-0.0.0.0}:${JUPYTER_PORT:-8888}:8888"', compose)
+        self.assertIn(
+            "--ServerApp.token=${JUPYTER_TOKEN:?Set JUPYTER_TOKEN to a strong, non-empty random value before starting Notebook}",
+            compose,
+        )
+        self.assertNotIn("--ServerApp.password=", compose)
         self.assertIn("source: ./notebooks", compose)
         self.assertIn("target: /workspace/notebooks", compose)
         self.assertIn("source: ./artifacts", compose)
         self.assertIn("target: /output", compose)
         self.assertIn("SR22_ARTIFACT_DIR: /output", compose)
+
+    def test_host_network_override_resets_parent_port_mapping(self) -> None:
+        host_compose = (REPOSITORY_ROOT / "compose.host.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("network_mode: host", host_compose)
+        self.assertIn("ports: !reset []", host_compose)
 
 
 if __name__ == "__main__":

@@ -530,14 +530,23 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
     )
     before_downwind_profile: CoordinatedTurnProfile | None = None
     ordinary_downwind_profile: CoordinatedTurnProfile | None = None
-    if spec.make_270_before_downwind:
+    if spec.make_270_before_downwind or spec.make_circle_before_downwind:
+        before_downwind_sweep_deg = (
+            -630.0
+            if spec.make_270_before_downwind and spec.make_circle_before_downwind
+            else -360.0
+            if spec.make_circle_before_downwind
+            else -270.0
+        )
         before_downwind_profile = generate_coordinated_turn_profile(
             true_airspeed_mps=speed_mps,
-            nominal_bank_deg=spec.normal_bank_deg,
+            nominal_bank_deg=spec.downwind_turn_bank_deg,
             roll_rate_deg_s=spec.roll_rate_deg_s,
-            signed_sweep_deg=-630.0 if spec.make_circle_before_downwind else -270.0,
+            signed_sweep_deg=before_downwind_sweep_deg,
             sample_interval_s=spec.sample_interval_s,
-            marker_sweeps_deg=(360.0,) if spec.make_circle_before_downwind else (),
+            marker_sweeps_deg=(360.0,)
+            if spec.make_270_before_downwind and spec.make_circle_before_downwind
+            else (),
         )
     else:
         ordinary_downwind_profile = generate_coordinated_turn_profile(
@@ -548,14 +557,23 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
             sample_interval_s=spec.sample_interval_s,
         )
     before_base_profile: CoordinatedTurnProfile | None = None
-    if spec.make_270_before_base:
+    if spec.make_270_before_base or spec.make_circle_before_base:
+        before_base_sweep_deg = (
+            -630.0
+            if spec.make_270_before_base and spec.make_circle_before_base
+            else -360.0
+            if spec.make_circle_before_base
+            else -270.0
+        )
         before_base_profile = generate_coordinated_turn_profile(
             true_airspeed_mps=speed_mps,
-            nominal_bank_deg=spec.normal_bank_deg,
+            nominal_bank_deg=spec.base_turn_bank_deg,
             roll_rate_deg_s=spec.roll_rate_deg_s,
-            signed_sweep_deg=-630.0 if spec.make_circle_before_base else -270.0,
+            signed_sweep_deg=before_base_sweep_deg,
             sample_interval_s=spec.sample_interval_s,
-            marker_sweeps_deg=(360.0,) if spec.make_circle_before_base else (),
+            marker_sweeps_deg=(360.0,)
+            if spec.make_270_before_base and spec.make_circle_before_base
+            else (),
         )
     ordinary_base_profile: CoordinatedTurnProfile | None = None
     if not spec.make_270_before_base:
@@ -584,18 +602,41 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
     before_downwind_turn: tuple[_LocalPoint, ...] = ()
     ordinary_downwind_turn: tuple[_LocalPoint, ...] = ()
     if before_downwind_profile is not None:
-        before_downwind_turn = _fit_turn_to_corner(
-            corner=(departure_station_m, downwind_offset_m),
-            start_heading_rad=math.pi / 2.0,
-            profile=before_downwind_profile,
-            start_label="before_downwind_turn_start",
-            end_label="before_downwind_turn_end",
-            milestone_label=(
-                "before_downwind_circle_complete"
-                if spec.make_circle_before_downwind
-                else None
-            ),
-        )
+        if spec.make_circle_before_downwind and not spec.make_270_before_downwind:
+            latent_270 = _fit_turn_to_corner(
+                corner=(departure_station_m, downwind_offset_m),
+                start_heading_rad=math.pi / 2.0,
+                profile=generate_coordinated_turn_profile(
+                    true_airspeed_mps=speed_mps,
+                    nominal_bank_deg=spec.downwind_turn_bank_deg,
+                    roll_rate_deg_s=spec.roll_rate_deg_s,
+                    signed_sweep_deg=-270.0,
+                    sample_interval_s=spec.sample_interval_s,
+                ),
+                start_label="before_downwind_turn_start",
+                end_label="before_downwind_turn_end",
+            )
+            before_downwind_turn = _profile_starting_at(
+                start=(latent_270[0].x_m, latent_270[0].y_m),
+                start_heading_rad=math.pi / 2.0,
+                profile=before_downwind_profile,
+                start_label="before_downwind_turn_start",
+                end_label="before_downwind_turn_end",
+            )
+        else:
+            before_downwind_turn = _fit_turn_to_corner(
+                corner=(departure_station_m, downwind_offset_m),
+                start_heading_rad=math.pi / 2.0,
+                profile=before_downwind_profile,
+                start_label="before_downwind_turn_start",
+                end_label="before_downwind_turn_end",
+                milestone_label=(
+                    "before_downwind_circle_complete"
+                    if spec.make_270_before_downwind
+                    and spec.make_circle_before_downwind
+                    else None
+                ),
+            )
     else:
         if ordinary_downwind_profile is None:
             raise AssertionError("ordinary Downwind-turn profile was not generated")
@@ -610,16 +651,40 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
     before_base_turn: tuple[_LocalPoint, ...] = ()
     ordinary_base_turn: tuple[_LocalPoint, ...] = ()
     if before_base_profile is not None:
-        before_base_turn = _fit_turn_to_corner(
-            corner=(base_station_m, downwind_offset_m),
-            start_heading_rad=math.pi,
-            profile=before_base_profile,
-            start_label="before_base_turn_start",
-            end_label="before_base_turn_end",
-            milestone_label=(
-                "before_base_circle_complete" if spec.make_circle_before_base else None
-            ),
-        )
+        if spec.make_circle_before_base and not spec.make_270_before_base:
+            latent_270 = _fit_turn_to_corner(
+                corner=(base_station_m, downwind_offset_m),
+                start_heading_rad=math.pi,
+                profile=generate_coordinated_turn_profile(
+                    true_airspeed_mps=speed_mps,
+                    nominal_bank_deg=spec.base_turn_bank_deg,
+                    roll_rate_deg_s=spec.roll_rate_deg_s,
+                    signed_sweep_deg=-270.0,
+                    sample_interval_s=spec.sample_interval_s,
+                ),
+                start_label="before_base_turn_start",
+                end_label="before_base_turn_end",
+            )
+            before_base_turn = _profile_starting_at(
+                start=(latent_270[0].x_m, latent_270[0].y_m),
+                start_heading_rad=math.pi,
+                profile=before_base_profile,
+                start_label="before_base_turn_start",
+                end_label="before_base_turn_end",
+            )
+        else:
+            before_base_turn = _fit_turn_to_corner(
+                corner=(base_station_m, downwind_offset_m),
+                start_heading_rad=math.pi,
+                profile=before_base_profile,
+                start_label="before_base_turn_start",
+                end_label="before_base_turn_end",
+                milestone_label=(
+                    "before_base_circle_complete"
+                    if spec.make_270_before_base and spec.make_circle_before_base
+                    else None
+                ),
+            )
     else:
         if ordinary_base_profile is None:
             raise AssertionError("ordinary Base-turn profile was not generated")
@@ -642,7 +707,7 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
     if spec.make_circle_middle_downwind:
         middle_downwind_profile = generate_coordinated_turn_profile(
             true_airspeed_mps=speed_mps,
-            nominal_bank_deg=spec.normal_bank_deg,
+            nominal_bank_deg=spec.downwind_turn_bank_deg,
             roll_rate_deg_s=spec.roll_rate_deg_s,
             signed_sweep_deg=-360.0,
             sample_interval_s=spec.sample_interval_s,
@@ -692,7 +757,9 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
     labels = {point.label: index for index, point in enumerate(local_points) if point.label}
     upwind_turn_start = labels["departure_turn_start"]
     descent_start = labels[
-        "before_base_turn_start" if spec.make_270_before_base else "base_turn_start"
+        "before_base_turn_start"
+        if spec.make_270_before_base or spec.make_circle_before_base
+        else "base_turn_start"
     ]
     final_rollout = labels["final_turn_end"]
     cumulative = [0.0]
@@ -1076,9 +1143,16 @@ def generate_traffic_pattern_components(
     components: list[PolylineReferencePath] = [base]
 
     speed_mps = knots_to_metres_per_second(spec.true_airspeed_kt)
-    outside_270_profile = generate_coordinated_turn_profile(
+    downwind_270_profile = generate_coordinated_turn_profile(
         true_airspeed_mps=speed_mps,
         nominal_bank_deg=spec.downwind_turn_bank_deg,
+        roll_rate_deg_s=spec.roll_rate_deg_s,
+        signed_sweep_deg=-270.0,
+        sample_interval_s=spec.sample_interval_s,
+    )
+    base_270_profile = generate_coordinated_turn_profile(
+        true_airspeed_mps=speed_mps,
+        nominal_bank_deg=spec.base_turn_bank_deg,
         roll_rate_deg_s=spec.roll_rate_deg_s,
         signed_sweep_deg=-270.0,
         sample_interval_s=spec.sample_interval_s,
@@ -1093,39 +1167,47 @@ def generate_traffic_pattern_components(
     downwind_270 = _fit_turn_to_corner(
         corner=(departure_station_m, downwind_offset_m),
         start_heading_rad=math.pi / 2.0,
-        profile=outside_270_profile,
+        profile=downwind_270_profile,
         start_label="before_downwind_turn_start",
         end_label="before_downwind_turn_end",
     )
     base_270 = _fit_turn_to_corner(
         corner=(base_station_m, downwind_offset_m),
         start_heading_rad=math.pi,
-        profile=outside_270_profile,
+        profile=base_270_profile,
         start_label="before_base_turn_start",
         end_label="before_base_turn_end",
     )
 
-    circle_profile: CoordinatedTurnProfile | None = None
+    downwind_circle_profile: CoordinatedTurnProfile | None = None
     if (
         spec.make_circle_before_downwind
         or spec.make_circle_middle_downwind
-        or spec.make_circle_before_base
     ):
-        circle_profile = generate_coordinated_turn_profile(
+        downwind_circle_profile = generate_coordinated_turn_profile(
             true_airspeed_mps=speed_mps,
             nominal_bank_deg=spec.downwind_turn_bank_deg,
             roll_rate_deg_s=spec.roll_rate_deg_s,
             signed_sweep_deg=-360.0,
             sample_interval_s=spec.sample_interval_s,
         )
+    base_circle_profile: CoordinatedTurnProfile | None = None
+    if spec.make_circle_before_base:
+        base_circle_profile = generate_coordinated_turn_profile(
+            true_airspeed_mps=speed_mps,
+            nominal_bank_deg=spec.base_turn_bank_deg,
+            roll_rate_deg_s=spec.roll_rate_deg_s,
+            signed_sweep_deg=-360.0,
+            sample_interval_s=spec.sample_interval_s,
+        )
 
     if spec.make_circle_before_downwind:
-        if circle_profile is None:
-            raise AssertionError("circle profile was not generated")
+        if downwind_circle_profile is None:
+            raise AssertionError("Downwind-circle profile was not generated")
         local_circle = _profile_starting_at(
             start=(downwind_270[0].x_m, downwind_270[0].y_m),
             start_heading_rad=math.pi / 2.0,
-            profile=circle_profile,
+            profile=downwind_circle_profile,
             start_label="before_downwind_circle_start",
             end_label="before_downwind_circle_end",
         )
@@ -1155,7 +1237,7 @@ def generate_traffic_pattern_components(
                     ),
                     corner=(departure_station_m, downwind_offset_m),
                     start_heading_rad=math.pi / 2.0,
-                    profile=outside_270_profile,
+                    profile=downwind_270_profile,
                     branch_label="before_downwind_branch",
                     turn_start_label="before_downwind_turn_start",
                     turn_end_label="before_downwind_turn_end",
@@ -1165,8 +1247,8 @@ def generate_traffic_pattern_components(
         )
 
     if spec.make_circle_middle_downwind:
-        if circle_profile is None:
-            raise AssertionError("circle profile was not generated")
+        if downwind_circle_profile is None:
+            raise AssertionError("Downwind-circle profile was not generated")
         downwind_start = _local_coordinates_from_path_point(
             spec,
             base_labels["downwind_turn_end"],
@@ -1181,7 +1263,7 @@ def generate_traffic_pattern_components(
                 0.5 * (downwind_start[1] + downwind_end[1]),
             ),
             start_heading_rad=math.pi,
-            profile=circle_profile,
+            profile=downwind_circle_profile,
             start_label="middle_downwind_circle_start",
             end_label="middle_downwind_circle_end",
         )
@@ -1194,12 +1276,12 @@ def generate_traffic_pattern_components(
         )
 
     if spec.make_circle_before_base:
-        if circle_profile is None:
-            raise AssertionError("circle profile was not generated")
+        if base_circle_profile is None:
+            raise AssertionError("Base-circle profile was not generated")
         local_circle = _profile_starting_at(
             start=(base_270[0].x_m, base_270[0].y_m),
             start_heading_rad=math.pi,
-            profile=circle_profile,
+            profile=base_circle_profile,
             start_label="before_base_circle_start",
             end_label="before_base_circle_end",
         )
@@ -1236,7 +1318,7 @@ def generate_traffic_pattern_components(
                     ),
                     corner=(base_station_m, downwind_offset_m),
                     start_heading_rad=math.pi,
-                    profile=outside_270_profile,
+                    profile=base_270_profile,
                     branch_label="before_base_branch",
                     turn_start_label="before_base_turn_start",
                     turn_end_label="before_base_turn_end",
