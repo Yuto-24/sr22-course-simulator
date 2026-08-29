@@ -379,7 +379,9 @@ Track / heading calculations must clearly state True vs Magnetic reference. Core
 Airport Reference Points are reference-only. Airport traffic-pattern geometry
 uses the applicable RWY Center Point, source-backed True Bearing and SI
 along-runway/lateral displacements. Magnetic Variation is not used to place KML
-coordinates.
+coordinates. Curved traffic-pattern ReferencePaths may use task-provided TAS,
+Bank and Roll-rate inputs with coordinated-turn physics, but remain desired
+wind-independent geometry rather than time-indexed aircraft Trajectories.
 
 ## 7. SR22 target configuration assumptions
 
@@ -425,7 +427,8 @@ src/sr22_course_simulator/
 │   ├── line.py
 │   ├── arc.py
 │   ├── spiral.py
-│   └── traffic_pattern.py
+│   ├── traffic_pattern.py
+│   └── short_downwind.py
 ├── guidance/
 │   ├── maneuver.py
 │   ├── path_following.py
@@ -473,8 +476,8 @@ environment    atmosphere, terrain and polymorphic wind providers
 performance    canonical tables, loader, interpolation, POH cruise query
 maneuver       source-semantic ManeuverSpec and separate AdvisoryReference
 airport        AirportSpec / RunwaySpec, DMS parsing and RWY Center Point
-data/airports  canonical RJFM AIP transcription
-path           wind-independent pylon, polyline and traffic-pattern geometry
+data/airports  canonical RJFM AIP and task-provided Short Downwind transcription
+path           wind-independent pylon, polyline, traffic-pattern and Short Downwind geometry
 guidance       wind triangle and bounded Spiral Descent guidance
 simulation     analytical mechanics, termination, forward integrator, Trajectory
 export         single/multi-placemark KML for ReferencePath and Trajectory

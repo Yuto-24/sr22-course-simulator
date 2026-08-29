@@ -12,7 +12,7 @@
 6. 終了理由、根拠ラベル、グラフを確認する。
 7. CSV / KML / PNG を保存する。
 
-`notebooks/miyazaki_traffic_patterns.ipynb` は別の workflow です。RJFM の Airport / Runway master data、threshold 中点の RWY Center Point、True Bearing、4本の風に依存しない Normal Traffic Pattern を順に確認し、`artifacts/traffic-patterns/` へ KML を保存します。ARP は表示・sanity check 専用です。
+`notebooks/miyazaki_traffic_patterns.ipynb` は別の workflow です。RJFMのAirport / Runway master data、threshold中点のRWY Center Point、True Bearing、110 KTASとBankから求めるMake Circle、3° Finalを順に確認し、`artifacts/traffic-patterns/`へGoogle Earth用の高度付きKMLを保存します。ARPは表示・sanity check専用です。
 
 現在の Spiral Descent 出力は、POH で検証された降下性能ではありません。確認済み POH Chapter 5 には 110 kt / 約 10% PWR / Bank 45〜55° の領域を定義する降下性能表がないため、Notebook でも `AssumedSteadyPointProvider` と固定迎角 closure を使用し、結果に `assumed` を残します。
 
@@ -40,14 +40,15 @@ docker compose up --build notebook
 起動ログに次の形式の URL が表示されます。
 
 ```text
-http://127.0.0.1:8888/lab?token=...
+http://127.0.0.1:8888/lab
 ```
 
 URL を開き、`spiral_descent_walkthrough.ipynb` を選択します。終了時は起動した Terminal で `Ctrl+C` を押します。
 
 場周経路を生成する場合は、同じ JupyterLab で `miyazaki_traffic_patterns.ipynb` を選択して上から実行します。
 
-Notebook は `127.0.0.1` にだけ公開します。Token 認証を無効化していません。
+Compose は `JUPYTER_TOKEN` と `JUPYTER_PASSWORD` を指定しなければ認証なしで起動します。
+既定の `JUPYTER_HOST=0.0.0.0` は host の全interfaceへportをbindするため、LANへ到達可能な環境ではNotebookが露出します。localhostだけに限定する場合は `JUPYTER_HOST=127.0.0.1` を指定してください。認証する場合は、起動前に `JUPYTER_TOKEN` を設定します。
 
 ## 条件を変えて実行する
 
@@ -162,11 +163,11 @@ docker compose up notebook
 Remove-Item Env:JUPYTER_PORT
 ```
 
-この場合、URL は `http://127.0.0.1:8890/lab?token=...` です。
+この場合、URL は `http://127.0.0.1:8890/lab` です。
 
 ### Token 付き URL が分からない
 
-起動中の service log を表示します。
+`JUPYTER_TOKEN` を設定して起動した場合は、起動中の service log を表示します。
 
 ```bash
 docker compose logs notebook

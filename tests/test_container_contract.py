@@ -71,7 +71,7 @@ class ContainerPythonVersionContractTests(unittest.TestCase):
         compose = (REPOSITORY_ROOT / "compose.yaml").read_text(encoding="utf-8")
 
         self.assertIn("target: notebook", compose)
-        self.assertIn('"127.0.0.1:${JUPYTER_PORT:-8888}:8888"', compose)
+        self.assertIn('"${JUPYTER_HOST:-0.0.0.0}:${JUPYTER_PORT:-8888}:8888"', compose)
         self.assertIn("source: ./notebooks", compose)
         self.assertIn("target: /workspace/notebooks", compose)
         self.assertIn("source: ./artifacts", compose)

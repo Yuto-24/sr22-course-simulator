@@ -15,8 +15,19 @@ services:
     init: true
     environment:
       SR22_ARTIFACT_DIR: /output
+    command:
+      - python
+      - -m
+      - jupyter
+      - lab
+      - --ip=0.0.0.0
+      - --port=8888
+      - --no-browser
+      - --ServerApp.root_dir=/workspace/notebooks
+      - --ServerApp.token=${JUPYTER_TOKEN:-}
+      - --ServerApp.password=${JUPYTER_PASSWORD:-}
     ports:
-      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"
+      - "${JUPYTER_HOST:-0.0.0.0}:${JUPYTER_PORT:-8888}:8888"
     volumes:
       - type: bind
         source: ./notebooks

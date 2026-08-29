@@ -2,6 +2,8 @@
 
 from sr22_course_simulator.export.csv import trajectory_to_csv, write_trajectory_csv
 from sr22_course_simulator.export.kml import (
+    GOOGLE_EARTH_TRAFFIC_PATTERN_STYLE,
+    KmlPathStyle,
     reference_path_to_kml,
     reference_paths_to_kml,
     trajectory_to_kml,
@@ -9,6 +11,8 @@ from sr22_course_simulator.export.kml import (
 )
 
 __all__ = [
+    "GOOGLE_EARTH_TRAFFIC_PATTERN_STYLE",
+    "KmlPathStyle",
     "reference_path_to_kml",
     "reference_paths_to_kml",
     "trajectory_to_csv",

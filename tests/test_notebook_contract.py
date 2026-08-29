@@ -118,7 +118,7 @@ class TrafficPatternNotebookContractTests(unittest.TestCase):
                 "## 2. RWY True Bearing",
                 "## 3. RWY Center Point",
                 "## 4. Pattern parameters",
-                "## 5. 4 pattern",
+                "## 5. 通常場周と独立Circle／270 Path",
                 "## 6. 簡易可視化",
                 "## 7. KML 出力",
             )
@@ -136,11 +136,32 @@ class TrafficPatternNotebookContractTests(unittest.TestCase):
         for expected in (
             "PATTERN_ALTITUDE_FT = 1000.0",
             "DOWNWIND_OFFSET_NM = 1.5",
-            "BASE_EXTENSION_NM = 1.2",
-            "CROSSWIND_EXTENSION_NM = 0.0",
+            "CROSSWIND_BASE_EXTENSION_NM = 1.2",
+            "TRUE_AIRSPEED_KT = 110.0",
+            "NORMAL_BANK_DEG = 22.0",
+            "DOWNWIND_TURN_BANK_DEG = 22.0",
+            "BASE_TURN_BANK_DEG = 22.0",
+            "FINAL_BANK_DEG = 25.0",
+            "ROLL_RATE_DEG_S = 10.0",
+            "GLIDE_PATH_DEG = 3.0",
+            "SAMPLE_INTERVAL_S = 0.25",
+            "SHORT_DOWNWIND_CIRCLE_TRUE_AIRSPEED_KT = 110.0",
+            "SHORT_DOWNWIND_CIRCLE_BANK_DEG = 22.0",
+            "RWY09_LINE_COLOR = 'ffffff00'",
+            "RWY09_FILL_COLOR = '1affffcc'",
+            "RWY27_LINE_COLOR = 'ff00aaff'",
+            "RWY27_FILL_COLOR = '1a80d4ff'",
             "MAGNETIC_REFERENCE_YEAR = 2026.0",
         ):
             self.assertIn(expected, source)
+        for switch_name in (
+            "MAKE_CIRCLE_BEFORE_DOWNWIND",
+            "MAKE_CIRCLE_MIDDLE_DOWNWIND",
+            "MAKE_CIRCLE_BEFORE_BASE",
+            "MAKE_270_BEFORE_DOWNWIND",
+            "MAKE_270_BEFORE_BASE",
+        ):
+            self.assertRegex(source, rf"{switch_name} = (True|False)")
 
     def test_notebook_uses_center_based_generator_and_expected_kml_writer(self) -> None:
         code = "\n".join(
@@ -149,9 +170,44 @@ class TrafficPatternNotebookContractTests(unittest.TestCase):
             if cell["cell_type"] == "code"
         )
         self.assertIn("runway.center_point", code)
-        self.assertIn("build_rjfm_normal_patterns(", code)
-        self.assertIn("write_rjfm_normal_pattern_kmls(", code)
+        self.assertIn("build_rjfm_traffic_pattern_components(", code)
+        self.assertIn("write_rjfm_traffic_pattern_kmls(", code)
+        self.assertIn("build_rjfm_short_downwind_paths(", code)
+        self.assertIn("write_rjfm_short_downwind_kmls(", code)
+        self.assertEqual(code.count("make_circle_before_downwind=MAKE_CIRCLE_BEFORE_DOWNWIND"), 3)
+        self.assertEqual(code.count("make_circle_middle_downwind=MAKE_CIRCLE_MIDDLE_DOWNWIND"), 3)
+        self.assertEqual(code.count("make_circle_before_base=MAKE_CIRCLE_BEFORE_BASE"), 3)
+        self.assertEqual(
+            code.count("make_270_before_downwind=MAKE_270_BEFORE_DOWNWIND"),
+            3,
+        )
+        self.assertEqual(code.count("make_270_before_base=MAKE_270_BEFORE_BASE"), 3)
+        self.assertEqual(
+            code.count("downwind_turn_bank_deg=DOWNWIND_TURN_BANK_DEG"),
+            3,
+        )
+        self.assertEqual(code.count("base_turn_bank_deg=BASE_TURN_BANK_DEG"), 3)
+        for color_parameter in (
+            "rwy09_line_color=RWY09_LINE_COLOR",
+            "rwy09_fill_color=RWY09_FILL_COLOR",
+            "rwy27_line_color=RWY27_LINE_COLOR",
+            "rwy27_fill_color=RWY27_FILL_COLOR",
+        ):
+            self.assertIn(color_parameter, code)
+        self.assertEqual(
+            code.count(
+                "circle_true_airspeed_kt=SHORT_DOWNWIND_CIRCLE_TRUE_AIRSPEED_KT"
+            ),
+            2,
+        )
+        self.assertEqual(
+            code.count("circle_bank_deg=SHORT_DOWNWIND_CIRCLE_BANK_DEG"),
+            2,
+        )
+        self.assertIn("normal_turn_radius_m", code)
+        self.assertIn("final_turn_radius_m", code)
         self.assertIn("RJFM_PATTERN_FILENAMES", code)
+        self.assertIn("expected_component_count", code)
         self.assertNotIn("ConstantWind", code)
         self.assertNotIn("NoWind", code)
 

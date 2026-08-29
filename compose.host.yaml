@@ -1,0 +1,4 @@
+services:
+  notebook:
+    network_mode: host
+    ports: []

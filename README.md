@@ -19,9 +19,9 @@ Windows / macOS の Docker Desktop では `LOCAL_UID` / `LOCAL_GID` を省略し
 docker compose up --build notebook
 ```
 
-Terminal に表示された `http://127.0.0.1:8888/lab?token=...` をブラウザで開き、`spiral_descent_walkthrough.ipynb` を選びます。Notebook の `### 2. 初期状態・風・明示的な仮定を入力する` で条件を編集し、上から順に実行してください。
+既定では `JUPYTER_TOKEN` / `JUPYTER_PASSWORD` を指定しないため、認証なしの `http://127.0.0.1:8888/lab` をブラウザで開き、`spiral_descent_walkthrough.ipynb` を選びます。Notebook の `### 2. 初期状態・風・明示的な仮定を入力する` で条件を編集し、上から順に実行してください。既定の `JUPYTER_HOST=0.0.0.0` はLANへ露出し得るため、localhostだけに限定する場合は `JUPYTER_HOST=127.0.0.1`、認証する場合は `JUPYTER_TOKEN` を設定してください。
 
-宮崎空港の4本の場周経路を確認する場合は `miyazaki_traffic_patterns.ipynb` を選びます。ARP は参照用に保持し、RWY09 / RWY27 の threshold 中点を RWY Center Point として True Bearing で経路を生成します。詳しい定義は [Airport Traffic-Pattern Reference Paths](docs/traffic-patterns.md) を参照してください。
+宮崎空港の経路を確認する場合は `miyazaki_traffic_patterns.ipynb` を選びます。RWY／NORTH・SOUTHごとに、Circle／270を含まない通常場周本体と、Before Downwind、Middle Downwind、Before BaseのCircle、Before Downwind/Baseの270を独立Pathとして生成します。5個のBooleanは相互に独立し、ONにしたPathを同一KML内の別Placemarkへ追加します。通常場周は110 kt・22° Bankの90° Downwind/Base turnを使用し、Base開始と同時に降下します。提示KMLのShort DownwindとRWY27 Entryを座標・高度変更なしで追加し、そのCircle半径だけを110 kt・22° Bankの約808.22 mへ置き換えて表示・出力します。KMLはGoogle Earth向けのabsolute altitude、100%不透明・幅1.0の線、地面まで約10%不透明の塗りつぶしを持ち、NotebookからRWY 09とRWY 27の線色・塗り色を個別に設定できます。詳しい定義は [Airport Traffic Pattern and Independent Turn Reference Paths](docs/traffic-patterns.md) を参照してください。
 
 結果は repository の `artifacts/` に保存されます。
 
@@ -242,7 +242,7 @@ POH の補間から得られる性能値と、学訓本文の Target / Control R
 - [Data Sources and Interpolation](docs/data-sources.md)
 - [Validation](docs/validation.md)
 - [Notebook Workflow](docs/notebook-workflow.md)
-- [Airport Traffic-Pattern Reference Paths](docs/traffic-patterns.md)
+- [Airport Make-Circle Traffic-Pattern Reference Paths](docs/traffic-patterns.md)
 - [Roadmap](docs/roadmap.md)
 - [Agent Rules](AGENTS.md)
 
@@ -260,7 +260,7 @@ POH の補間から得られる性能値と、学訓本文の Target / Control R
 - wind-independent `ReferencePath` と time-indexed `Trajectory`
 - 2D Ground Track、Altitude-Time、3D plot helper（Matplotlib は optional）
 - Trajectory の CSV export、Trajectory / Reference Path の KML 3D LineString export
-- AIP 転記値を保持する `AirportSpec` / `RunwaySpec`、ARP 非依存の RWY Center Point、RJFM の4本の Normal Traffic Pattern と multi-Placemark KML
+- AIP転記値を保持する`AirportSpec` / `RunwaySpec`、ARP非依存のRWY Center Point、RJFMの4本のMake-Circle Traffic Patternと高度付きGoogle Earth KML
 
 ### Source coverage
 
@@ -340,4 +340,4 @@ sr22-spiral-demo --mode forward --calm --kml artifacts/forward-spiral.kml
 
 Python API では `simulate_forward(...)` は ManeuverSpec を受け取らず、`simulate_guided_spiral_descent(...)` は narrative-derived `ManeuverSpec` と別オブジェクトの `PylonSpiralPath` を受け取ります。この分離により、固定入力実験を公式課目の再現として誤表示しません。
 
-`PYTHON_VERSION`、`LOCAL_UID`、`LOCAL_GID`、`JUPYTER_PORT` は Compose の環境変数として上書き可能です。`PYTHON_VERSION` が解決する interpreter は Python 3.11 以上でなければならず、それ未満では image build が明示的に失敗します。Container は非 root user で動作し、PDF 原資料を image に含めません。Matplotlib / Jupyter は notebook image にだけ含め、CLI runtime image には含めません。
+`PYTHON_VERSION`、`LOCAL_UID`、`LOCAL_GID`、`JUPYTER_HOST`、`JUPYTER_PORT` は Compose の環境変数として上書き可能です。`JUPYTER_HOST` は公開先ホストアドレスを制御し、Windows 側からのアクセスが必要な場合は `0.0.0.0` を使ってください。`PYTHON_VERSION` が解決する interpreter は Python 3.11 以上でなければならず、それ未満では image build が明示的に失敗します。Container は非 root user で動作し、PDF 原資料を image に含めません。Matplotlib / Jupyter は notebook image にだけ含め、CLI runtime image には含めません。
