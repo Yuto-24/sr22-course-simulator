@@ -57,7 +57,7 @@ URL を開き、`spiral_descent_walkthrough.ipynb` を選択します。終了�
 場周経路を生成する場合は、同じ JupyterLab で `miyazaki_traffic_patterns.ipynb` を選択して上から実行します。
 
 Compose は強い非空の `JUPYTER_TOKEN` を必須にして起動します。未設定または空文字の場合、ComposeはNotebookを起動せずエラーにします。起動ログのURLにはtokenが含まれます。
-既定の `JUPYTER_HOST=0.0.0.0` はWindows hostからのアクセスを維持しますが、hostの全interfaceへportをbindします。localhostだけに限定する場合は `JUPYTER_HOST=127.0.0.1` を指定してください。LANまたは`compose.host.yaml`のhost-networkで公開する場合は、tokenだけに依存せずTLS終端済みreverse proxyの背後で運用してください。
+通常Composeの既定は `JUPYTER_HOST=127.0.0.1` で、localhostだけへportをbindします。Windows/WSL host accessが必要な場合は`compose.host.yaml`を併用できますが、host-networkではJupyterが全interfaceへbindします。LANまたはhost-networkで公開する場合は、tokenだけに依存せずTLS終端済みreverse proxyの背後で運用してください。
 
 ## 条件を変えて実行する
 

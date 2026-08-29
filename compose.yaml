@@ -26,7 +26,7 @@ services:
       - --ServerApp.root_dir=/workspace/notebooks
       - --ServerApp.token=${JUPYTER_TOKEN:?Set JUPYTER_TOKEN to a strong, non-empty random value before starting Notebook}
     ports:
-      - "${JUPYTER_HOST:-0.0.0.0}:${JUPYTER_PORT:-8888}:8888"
+      - "${JUPYTER_HOST:-127.0.0.1}:${JUPYTER_PORT:-8888}:8888"
     volumes:
       - type: bind
         source: ./notebooks
