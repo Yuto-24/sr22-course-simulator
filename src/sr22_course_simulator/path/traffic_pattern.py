@@ -737,8 +737,10 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
     labels = {point.label: index for index, point in enumerate(local_points) if point.label}
     upwind_turn_start = labels["departure_turn_start"]
     descent_start = labels[
-        "before_base_turn_start"
-        if spec.make_270_before_base or spec.make_circle_before_base
+        "before_base_turn_end"
+        if spec.make_circle_before_base and not spec.make_270_before_base
+        else "before_base_turn_start"
+        if spec.make_270_before_base
         else "base_turn_start"
     ]
     final_rollout = labels["final_turn_end"]

@@ -77,7 +77,7 @@ Before Downwind／Before BaseのCircleは、270のON/OFFにかかわらず同じ
 - Aiming Markerの滑走路面MSL標高からUpwind turn開始点の1,000 ft MSLまで、Upwind距離に比例して上昇します。
 - Upwind turn開始から降下対象turnの開始までは1,000 ft MSLです。
 - 通常場周本体は通常Base Turnの開始から、Final rolloutまで経路距離に比例して3° Finalへの接続高度まで降下します。
-- Circle PathとBefore Downwind 270 Pathは全区間1,000 ft MSLを維持します。
+- Circle PathとBefore Downwind 270 Pathは全区間1,000 ft MSLを維持します。単一経路APIのBefore Base Circle-onlyもCircle中は場周高度を維持し、`before_base_turn_end`（通常90° Base Turnとの共有点）から降下します。270を含む単一経路は従来どおり`before_base_turn_start`から降下します。
 - Before Base 270 Pathは、通常22° Base Turnの水平polyline沿程長を基準にします。代替Pathのmergeからその距離を正確に逆算した`before_base_descent_start`までは1,000 ft MSLを維持し、そこから`before_base_merge`まで水平沿程距離に比例して降下します。merge高度は通常`base_turn_end`と完全に一致します。代替Pathがこの基準長より短い場合は`ValidationError`です。
 - Final rollout以降はAiming Markerを0 ft AGLとする3° pathです。
 - 滑走路長が2,400 m以上ならAiming MarkerはTHRから400 m、その他は300 mです。

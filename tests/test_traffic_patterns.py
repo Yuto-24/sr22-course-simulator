@@ -478,8 +478,10 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                                     not (make_270_base or before_base),
                                 )
                                 descent_start = indices[
-                                    "before_base_turn_start"
-                                    if make_270_base or before_base
+                                    "before_base_turn_end"
+                                    if before_base and not make_270_base
+                                    else "before_base_turn_start"
+                                    if make_270_base
                                     else "base_turn_start"
                                 ]
                                 final_end = indices["final_turn_end"]
@@ -761,6 +763,11 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                         indices = {p.label: i for i, p in enumerate(points) if p.label}
                         start = indices[f"before_{location}_turn_start"]
                         circle_end = indices[f"before_{location}_turn_end"]
+                        if location == "base":
+                            pattern_altitude = feet_to_metres(spec.altitude_ft)
+                            for point in points[start:circle_end + 1]:
+                                self.assertAlmostEqual(point.altitude_m, pattern_altitude)
+                            self.assertLess(points[circle_end + 1].altitude_m, pattern_altitude)
                         # The circle endpoint also starts the ordinary turn.
                         turn_end = indices[f"{location}_turn_end"]
                         for first, last, sweep in (
