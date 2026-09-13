@@ -30,7 +30,7 @@ FROM base AS test
 COPY --chown=simulator:simulator tests/ ./tests/
 COPY --chown=simulator:simulator notebooks/ ./notebooks/
 COPY --chown=simulator:simulator docs/ ./docs/
-COPY --chown=simulator:simulator Dockerfile README.md compose.yaml pyproject.toml ./
+COPY --chown=simulator:simulator Dockerfile README.md compose.yaml compose.host.yaml pyproject.toml ./
 
 CMD ["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"]
 

@@ -15,8 +15,25 @@ services:
     init: true
     environment:
       SR22_ARTIFACT_DIR: /output
+      JUPYTER_TOKEN: "${JUPYTER_TOKEN:-}"
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        : "$${JUPYTER_TOKEN:?Set JUPYTER_TOKEN to a strong, non-empty random value before starting Notebook}"
+        exec "$$@" "--ServerApp.token=$${JUPYTER_TOKEN}"
+      - notebook-entrypoint
+    command:
+      - python
+      - -m
+      - jupyter
+      - lab
+      - --ip=0.0.0.0
+      - --port=8888
+      - --no-browser
+      - --ServerApp.root_dir=/workspace/notebooks
     ports:
-      - "127.0.0.1:${JUPYTER_PORT:-8888}:8888"
+      - "${JUPYTER_HOST:-127.0.0.1}:${JUPYTER_PORT:-8888}:8888"
     volumes:
       - type: bind
         source: ./notebooks

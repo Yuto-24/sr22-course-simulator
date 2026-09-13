@@ -12,7 +12,7 @@
 6. 終了理由、根拠ラベル、グラフを確認する。
 7. CSV / KML / PNG を保存する。
 
-`notebooks/miyazaki_traffic_patterns.ipynb` は別の workflow です。RJFM の Airport / Runway master data、threshold 中点の RWY Center Point、True Bearing、4本の風に依存しない Normal Traffic Pattern を順に確認し、`artifacts/traffic-patterns/` へ KML を保存します。ARP は表示・sanity check 専用です。
+`notebooks/miyazaki_traffic_patterns.ipynb` は別の workflow です。RJFMのAirport / Runway master data、threshold中点のRWY Center Point、True Bearing、110 KTASとBankから求めるMake Circle、3° Finalを順に確認し、`artifacts/traffic-patterns/`へGoogle Earth用の高度付きKMLを保存します。ARPは表示・sanity check専用です。
 
 現在の Spiral Descent 出力は、POH で検証された降下性能ではありません。確認済み POH Chapter 5 には 110 kt / 約 10% PWR / Bank 45〜55° の領域を定義する降下性能表がないため、Notebook でも `AssumedSteadyPointProvider` と固定迎角 closure を使用し、結果に `assumed` を残します。
 
@@ -24,16 +24,25 @@ Repository root で実行します。
 
 ```bash
 mkdir -p artifacts
-LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose up --build notebook
+JUPYTER_TOKEN="$(openssl rand -hex 32)" LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose up --build notebook
 ```
 
 `LOCAL_UID` / `LOCAL_GID` を container user に反映するため、Notebook と生成物をホスト側ユーザーで編集できます。
 
-### Windows / macOS
+### macOS
 
 Docker Desktop では UID / GID を指定せずに起動できます。
 
 ```bash
+JUPYTER_TOKEN="replace-with-a-strong-random-secret" docker compose up --build notebook
+```
+
+### Windows PowerShell
+
+```powershell
+$tokenBytes = [byte[]]::new(32)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($tokenBytes)
+$env:JUPYTER_TOKEN = [Convert]::ToHexString($tokenBytes)
 docker compose up --build notebook
 ```
 
@@ -47,7 +56,8 @@ URL を開き、`spiral_descent_walkthrough.ipynb` を選択します。終了�
 
 場周経路を生成する場合は、同じ JupyterLab で `miyazaki_traffic_patterns.ipynb` を選択して上から実行します。
 
-Notebook は `127.0.0.1` にだけ公開します。Token 認証を無効化していません。
+Notebook の entrypoint は起動時に `JUPYTER_TOKEN` の非空を検査します。強いランダム値を指定してください。未設定または空文字の場合、JupyterLab を起動せずエラーにします。test・simulator の実行や image build には token は不要です。起動ログのURLにはtokenが含まれます。
+通常Composeの既定は `JUPYTER_HOST=127.0.0.1` で、localhostだけへportをbindします。Windows/WSL host accessが必要な場合は`compose.host.yaml`を併用できますが、host-networkではJupyterが全interfaceへbindします。LANまたはhost-networkで公開する場合は、tokenだけに依存せずTLS終端済みreverse proxyの背後で運用してください。
 
 ## 条件を変えて実行する
 
@@ -151,15 +161,19 @@ docker compose run --rm test
 Linux / macOS:
 
 ```bash
-JUPYTER_PORT=8890 docker compose up notebook
+JUPYTER_TOKEN="$(openssl rand -hex 32)" JUPYTER_PORT=8890 docker compose up notebook
 ```
 
 Windows PowerShell:
 
 ```powershell
 $env:JUPYTER_PORT = "8890"
+$tokenBytes = [byte[]]::new(32)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($tokenBytes)
+$env:JUPYTER_TOKEN = [Convert]::ToHexString($tokenBytes)
 docker compose up notebook
 Remove-Item Env:JUPYTER_PORT
+Remove-Item Env:JUPYTER_TOKEN
 ```
 
 この場合、URL は `http://127.0.0.1:8890/lab?token=...` です。

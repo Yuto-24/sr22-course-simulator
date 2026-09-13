@@ -10,18 +10,27 @@ Docker が使える Linux では、repository root で次を実行します。
 
 ```bash
 mkdir -p artifacts
-LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose up --build notebook
+JUPYTER_TOKEN="$(openssl rand -hex 32)" LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose up --build notebook
 ```
 
-Windows / macOS の Docker Desktop では `LOCAL_UID` / `LOCAL_GID` を省略します。
+macOS の Docker Desktop では `LOCAL_UID` / `LOCAL_GID` を省略します。
 
 ```bash
+JUPYTER_TOKEN="replace-with-a-strong-random-secret" docker compose up --build notebook
+```
+
+Windows PowerShell では、暗号学的乱数からtokenを生成します。
+
+```powershell
+$tokenBytes = [byte[]]::new(32)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($tokenBytes)
+$env:JUPYTER_TOKEN = [Convert]::ToHexString($tokenBytes)
 docker compose up --build notebook
 ```
 
-Terminal に表示された `http://127.0.0.1:8888/lab?token=...` をブラウザで開き、`spiral_descent_walkthrough.ipynb` を選びます。Notebook の `### 2. 初期状態・風・明示的な仮定を入力する` で条件を編集し、上から順に実行してください。
+Notebook の entrypoint は起動時に `JUPYTER_TOKEN` の非空を検査してJupyterLabを起動します。強いランダム値を指定してください。test・simulator の実行や image build には token は不要です。起動ログの `http://127.0.0.1:8888/lab?token=...` をブラウザで開き、`spiral_descent_walkthrough.ipynb` を選びます。Notebook の `### 2. 初期状態・風・明示的な仮定を入力する` で条件を編集し、上から順に実行してください。通常Composeの既定は `JUPYTER_HOST=127.0.0.1` です。Windows/WSL host accessが必要な場合は `compose.host.yaml` を併用できますが、これはJupyterを全interfaceへbindするため、TLS終端済みreverse proxyの背後でのみ運用してください。
 
-宮崎空港の4本の場周経路を確認する場合は `miyazaki_traffic_patterns.ipynb` を選びます。ARP は参照用に保持し、RWY09 / RWY27 の threshold 中点を RWY Center Point として True Bearing で経路を生成します。詳しい定義は [Airport Traffic-Pattern Reference Paths](docs/traffic-patterns.md) を参照してください。
+宮崎空港の経路を確認する場合は `miyazaki_traffic_patterns.ipynb` を選びます。RWY／NORTH・SOUTHごとに、Circle／270を含まない通常場周本体と、Before Downwind、Middle Downwind、Before BaseのCircle、Before Downwind/Baseの270を独立Pathとして生成します。5個のBooleanは相互に独立し、ONにしたPathを同一KML内の別Placemarkへ追加します。通常場周は110 kt・22° Bankの90° Downwind/Base turnを使用し、Base開始と同時に降下します。提示KMLのShort DownwindとRWY27 Entryを座標・高度変更なしで追加し、そのCircle半径だけを110 kt・22° Bankの約808.22 mへ置き換えて表示・出力します。KMLはGoogle Earth向けのabsolute altitude、100%不透明・幅1.0の線、地面まで約10%不透明の塗りつぶしを持ち、NotebookからRWY 09とRWY 27の線色・塗り色を個別に設定できます。詳しい定義は [Airport Traffic Pattern and Independent Turn Reference Paths](docs/traffic-patterns.md) を参照してください。
 
 結果は repository の `artifacts/` に保存されます。
 
@@ -242,7 +251,7 @@ POH の補間から得られる性能値と、学訓本文の Target / Control R
 - [Data Sources and Interpolation](docs/data-sources.md)
 - [Validation](docs/validation.md)
 - [Notebook Workflow](docs/notebook-workflow.md)
-- [Airport Traffic-Pattern Reference Paths](docs/traffic-patterns.md)
+- [Airport Make-Circle Traffic-Pattern Reference Paths](docs/traffic-patterns.md)
 - [Roadmap](docs/roadmap.md)
 - [Agent Rules](AGENTS.md)
 
@@ -260,7 +269,7 @@ POH の補間から得られる性能値と、学訓本文の Target / Control R
 - wind-independent `ReferencePath` と time-indexed `Trajectory`
 - 2D Ground Track、Altitude-Time、3D plot helper（Matplotlib は optional）
 - Trajectory の CSV export、Trajectory / Reference Path の KML 3D LineString export
-- AIP 転記値を保持する `AirportSpec` / `RunwaySpec`、ARP 非依存の RWY Center Point、RJFM の4本の Normal Traffic Pattern と multi-Placemark KML
+- AIP転記値を保持する`AirportSpec` / `RunwaySpec`、ARP非依存のRWY Center Point、RJFMの4本のMake-Circle Traffic Patternと高度付きGoogle Earth KML
 
 ### Source coverage
 
@@ -340,4 +349,4 @@ sr22-spiral-demo --mode forward --calm --kml artifacts/forward-spiral.kml
 
 Python API では `simulate_forward(...)` は ManeuverSpec を受け取らず、`simulate_guided_spiral_descent(...)` は narrative-derived `ManeuverSpec` と別オブジェクトの `PylonSpiralPath` を受け取ります。この分離により、固定入力実験を公式課目の再現として誤表示しません。
 
-`PYTHON_VERSION`、`LOCAL_UID`、`LOCAL_GID`、`JUPYTER_PORT` は Compose の環境変数として上書き可能です。`PYTHON_VERSION` が解決する interpreter は Python 3.11 以上でなければならず、それ未満では image build が明示的に失敗します。Container は非 root user で動作し、PDF 原資料を image に含めません。Matplotlib / Jupyter は notebook image にだけ含め、CLI runtime image には含めません。
+`PYTHON_VERSION`、`LOCAL_UID`、`LOCAL_GID`、`JUPYTER_HOST`、`JUPYTER_PORT` は Compose の環境変数として上書き可能です。Notebook 起動時の `JUPYTER_TOKEN` は強い非空の値が必須です。通常Composeの`JUPYTER_HOST`既定値は `127.0.0.1` です。Windows/WSL host access向けの`compose.host.yaml`はJupyterを全interfaceへ公開するため、TLS終端済みreverse proxyの背後に限定してください。`PYTHON_VERSION` が解決する interpreter は Python 3.11 以上でなければならず、それ未満では image build が明示的に失敗します。Container は非root userで動作し、PDF原資料をimageに含めません。Matplotlib / Jupyter はnotebook imageにだけ含め、CLI runtime imageには含めません。

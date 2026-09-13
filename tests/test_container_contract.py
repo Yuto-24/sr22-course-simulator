@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import json
+import os
 import re
+import subprocess
+import sys
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -20,7 +25,7 @@ class ContainerPythonVersionContractTests(unittest.TestCase):
         self.assertIn("actual < minimum", dockerfile)
         self.assertIn("this project requires Python >= 3.11", dockerfile)
         self.assertIn(
-            "COPY --chown=simulator:simulator Dockerfile README.md compose.yaml pyproject.toml ./",
+            "COPY --chown=simulator:simulator Dockerfile README.md compose.yaml compose.host.yaml pyproject.toml ./",
             dockerfile,
         )
         self.assertIn("COPY --chown=simulator:simulator docs/ ./docs/", dockerfile)
@@ -71,12 +76,55 @@ class ContainerPythonVersionContractTests(unittest.TestCase):
         compose = (REPOSITORY_ROOT / "compose.yaml").read_text(encoding="utf-8")
 
         self.assertIn("target: notebook", compose)
-        self.assertIn('"127.0.0.1:${JUPYTER_PORT:-8888}:8888"', compose)
+        self.assertIn('"${JUPYTER_HOST:-127.0.0.1}:${JUPYTER_PORT:-8888}:8888"', compose)
+        self.assertIn(
+            'JUPYTER_TOKEN: "${JUPYTER_TOKEN:-}"',
+            compose,
+        )
+        self.assertNotIn("--ServerApp.password=", compose)
         self.assertIn("source: ./notebooks", compose)
         self.assertIn("target: /workspace/notebooks", compose)
         self.assertIn("source: ./artifacts", compose)
         self.assertIn("target: /output", compose)
         self.assertIn("SR22_ARTIFACT_DIR: /output", compose)
+
+    def test_notebook_entrypoint_requires_token_only_at_startup(self) -> None:
+        compose = (REPOSITORY_ROOT / "compose.yaml").read_text(encoding="utf-8")
+        # Execute the actual shell block after Compose's dollar unescaping.
+        block = compose.split("      - |\n", 1)[1].split(
+            "      - notebook-entrypoint", 1
+        )[0]
+        script = textwrap.dedent(block).replace("$$", "$")
+        environment = dict(os.environ)
+        environment.pop("JUPYTER_TOKEN", None)
+        for token in (None, "", "test token $literal; 'quoted' \"value\""):
+            with self.subTest(token_present=bool(token)):
+                if token is not None:
+                    environment["JUPYTER_TOKEN"] = token
+                result = subprocess.run(
+                    ["/bin/sh", "-ec", script, "notebook-entrypoint",
+                     sys.executable, "-c",
+                     "import json, sys; print(json.dumps(sys.argv[1:]))",
+                     "--existing-argument"],
+                    env=environment, capture_output=True, text=True,
+                )
+                if token:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(json.loads(result.stdout), [
+                        "--existing-argument", f"--ServerApp.token={token}",
+                    ])
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("Set JUPYTER_TOKEN", result.stderr)
+                    self.assertEqual(result.stdout, "")
+
+    def test_host_network_override_resets_parent_port_mapping(self) -> None:
+        host_compose = (REPOSITORY_ROOT / "compose.host.yaml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("network_mode: host", host_compose)
+        self.assertIn("ports: !reset []", host_compose)
 
 
 if __name__ == "__main__":

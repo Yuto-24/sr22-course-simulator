@@ -118,9 +118,15 @@ Examples:
 - AIP DMS parsing and RJFM threshold transcription;
 - threshold-derived runway length and ARP-to-threshold sanity distance;
 - RWY Center Point equality for reciprocal directions;
-- left/right traffic-pattern geometry and 1.5 NM downwind offset;
-- 1.2 NM base extension and explicit 0.0 NM crosswind extension;
-- fixed 1000 ft MSL path altitude and semantic waypoint order;
+- left/right traffic-pattern geometry, the fixed 1.5 NM downwind axis, shared 1.2 NM reciprocal Crosswind/Base axes, and preserved leg tangencies;
+- 110 KTAS coordinated-turn radii, 10 deg/s roll transitions and independent 90/270/360-degree sweeps;
+- Circle/270の全32通りの独立ON/OFF組み合わせと、通常場周本体へCircle/270が混入しないこと;
+- 通常場周本体が110 KTAS / 22-degreeの90° Downwind/Base turnを使用し、Base-turn entryから降下を開始すること;
+- 各通常場周KMLと全場周結合KMLで、本体・各Circle・各270が別Placemarkであること;
+- verbatim retention of all 44 task-provided Short Downwind and all 23 RWY27 Entry longitude/latitude/altitude triples;
+- Short Downwind Circle tangency, constant 1000 ft MSL altitude, closure and 110 KTAS / 22-degree physics-derived 808.22 m radius;
+- Make-Circle ordering and outside-of-pattern turn direction;
+- Aiming-Marker-originated Upwind proportional climb to 1000 ft MSL, level segments, Base descent, 3-degree Final and aiming-marker rules;
 - ground-reference geometry;
 - KML longitude/latitude/altitude ordering.
 
@@ -258,9 +264,10 @@ Current regression groups cover:
 - verified POH cruise source nodes and source-backed target-configuration correction separation;
 - source-semantic Spiral Descent transcription, advisory isolation, Bank limit and phase-specific Power behavior;
 - Reference Path wind independence and pylon projection;
-- KML `longitude,latitude,altitude` order, coordinate count, altitude retention and XML escaping;
-- RJFM Airport/Runway master data, magnetic variation, four traffic-pattern paths,
-  four individual KML files and one four-Placemark KML document;
+- KML `longitude,latitude,altitude` order, coordinate count, altitude retention, XML escaping and individual/combined KMLのRWY 09・RWY 27別style;
+- RJFM Airport/Runway master data, magnetic variation, four Make-Circle traffic-pattern paths,
+  four individual extruded-altitude KML files whose first Placemark is the base path plus enabled independent components;
+  the API defaults produce five Placemarks per individual KML and twenty in the combined KML, while the Notebook's all-ON configuration produces six and twenty-four respectively;
 - clean, compilable Notebook contracts for both Spiral Descent and RJFM traffic patterns.
 
 The runnable demonstration is also exercised as a smoke test, but its plausible shape is not treated as aircraft-model validation. Its assumption evidence must survive in the resulting `Trajectory`.

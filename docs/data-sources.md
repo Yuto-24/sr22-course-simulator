@@ -419,10 +419,34 @@ threshold elevations. Compact DMS is parsed deterministically. RWY Center Point,
 measured threshold distance, runway vectors and normals are derived values and
 are not separately transcribed.
 
-The Aviation College operating-material values for 1000 ft MSL, 1.5 NM
-downwind offset and 1.2 NM base extension are kept in a separate
-`TrafficPatternSpec` source role. The 0.0 NM crosswind extension is labeled as
-an explicit task assumption.
+The Miyazaki procedure identifies a 1000-ft pattern altitude without calling
+it MSL; the Chapter 4 figure depicts 1000 ft AGL. The task explicitly applies
+1000 ft MSL to this ReferencePath. The materials also identify the 1.5 NM
+downwind value and a Miyazaki 1.2 NM noise-abatement designation. They also
+state north-pattern normal use/south-pattern allowance, a post-runway-end and
+700-ft turn condition, a TPA-minus-300-ft Crosswind convention, 20 degrees
+during climb, and an RWY27 designated-point condition. None of those operational
+conditions is reproduced by this `ReferencePath`.
+
+The task selects 110 KTAS and 10 deg/s Roll for the ReferencePath geometry.
+Circle／270 components share 22-degree Bank, including their independent
+360-degree Circle and 270-degree turn paths. The normal Upwind turn uses
+30-degree Bank, while the Final turn uses 25-degree Bank. It deliberately treats
+1.2 NM as one shared `crosswind_base_extension_nm`, not independent base and
+crosswind offsets. Linear runway-elevation interpolation at the Aiming Marker,
+proportional Upwind climb, and a 30-degree Upwind-to-Crosswind turn are explicit
+simplifications. Turn radii and the 22-degree 360-degree Make Circle's
+approximately 127.62 m forward displacement from its roll transitions are
+physics-derived; these inputs are not promoted to POH-backed aircraft performance.
+
+The Short Downwind sources are separate user-provided KML rather than AIP or
+training-procedure data. The main path's 44 and RWY27 Entry's 23
+longitude/latitude/absolute-altitude triples are retained verbatim as canonical
+task data. The accompanying Circle KML is
+not retained as a fixed-radius table: its task-provided tangency point is kept,
+while the radius is replaced by the analytical steady coordinated-turn radius
+at 110 KTAS and 22 degrees Bank (about 808.22 m). The circle placement remains
+assumption-dependent and is not POH-backed aircraft performance.
 
 ## 15. Canonical JSON schema
 
