@@ -70,6 +70,8 @@ Left Trafficの外側turnはRight、Right TrafficではLeftです。仮想コー
 
 Before Downwind／Before BaseのCircleは、270のON/OFFにかかわらず同じ潜在270° turnを内部計算し、その`before_*_turn_start`座標と進入Headingから始めます。Circleには接続線を含めません。対応する270 Placemarkは、通常場周の`before_*_branch`から同軸の進入接続線、270° arc（既存の`before_*_turn_start`から`before_*_turn_end`）、同軸の退出接続線、`before_*_merge`までを連続して含みます。branch／mergeは通常場周の22° turnの開始／終了座標と完全に一致します。
 
+単一の連続経路を返す`generate_traffic_pattern()`では、Circle ON／270 OFFの場合、360° Circleの終了点を通常90° turnの開始点へ合わせ、その後に通常turnを続けます。Roll遷移によるCircleの前進量も含めて終点合わせし、leg axisと接線を維持します。共有点は`before_*_turn_end`、通常turnの終了点は`downwind_turn_end`／`base_turn_end`です。独立component APIのCircleは引き続き潜在270の開始点に配置します。
+
 ## 高度
 
 - Aiming Markerの滑走路面MSL標高からUpwind turn開始点の1,000 ft MSLまで、Upwind距離に比例して上昇します。

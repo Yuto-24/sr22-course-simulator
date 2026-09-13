@@ -548,7 +548,7 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
             if spec.make_270_before_downwind and spec.make_circle_before_downwind
             else (),
         )
-    else:
+    if not spec.make_270_before_downwind:
         ordinary_downwind_profile = generate_coordinated_turn_profile(
             true_airspeed_mps=speed_mps,
             nominal_bank_deg=spec.downwind_turn_bank_deg,
@@ -601,28 +601,27 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
     )
     before_downwind_turn: tuple[_LocalPoint, ...] = ()
     ordinary_downwind_turn: tuple[_LocalPoint, ...] = ()
+    if ordinary_downwind_profile is not None:
+        ordinary_downwind_turn = _fit_turn_to_corner(
+            corner=(departure_station_m, downwind_offset_m),
+            start_heading_rad=math.pi / 2.0,
+            profile=ordinary_downwind_profile,
+            start_label="downwind_turn_start",
+            end_label="downwind_turn_end",
+        )
     if before_downwind_profile is not None:
         if spec.make_circle_before_downwind and not spec.make_270_before_downwind:
-            latent_270 = _fit_turn_to_corner(
-                corner=(departure_station_m, downwind_offset_m),
-                start_heading_rad=math.pi / 2.0,
-                profile=generate_coordinated_turn_profile(
-                    true_airspeed_mps=speed_mps,
-                    nominal_bank_deg=spec.downwind_turn_bank_deg,
-                    roll_rate_deg_s=spec.roll_rate_deg_s,
-                    signed_sweep_deg=-270.0,
-                    sample_interval_s=spec.sample_interval_s,
-                ),
-                start_label="before_downwind_turn_start",
-                end_label="before_downwind_turn_end",
-            )
-            before_downwind_turn = _profile_starting_at(
-                start=(latent_270[0].x_m, latent_270[0].y_m),
+            # Keep the normal leg axes: finish the rolling circle exactly at
+            # the ordinary 90-degree turn's tangent entry, then fly that turn.
+            before_downwind_turn = _fit_profile_ending_at(
+                end=(ordinary_downwind_turn[0].x_m, ordinary_downwind_turn[0].y_m),
                 start_heading_rad=math.pi / 2.0,
                 profile=before_downwind_profile,
                 start_label="before_downwind_turn_start",
                 end_label="before_downwind_turn_end",
             )
+            # The shared point retains the circle-end label.
+            before_downwind_turn += ordinary_downwind_turn[1:]
         else:
             before_downwind_turn = _fit_turn_to_corner(
                 corner=(departure_station_m, downwind_offset_m),
@@ -637,41 +636,31 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
                     else None
                 ),
             )
-    else:
-        if ordinary_downwind_profile is None:
-            raise AssertionError("ordinary Downwind-turn profile was not generated")
-        ordinary_downwind_turn = _fit_turn_to_corner(
-            corner=(departure_station_m, downwind_offset_m),
-            start_heading_rad=math.pi / 2.0,
-            profile=ordinary_downwind_profile,
-            start_label="downwind_turn_start",
-            end_label="downwind_turn_end",
-        )
+
     downwind_entry_turn = before_downwind_turn or ordinary_downwind_turn
     before_base_turn: tuple[_LocalPoint, ...] = ()
     ordinary_base_turn: tuple[_LocalPoint, ...] = ()
+    if ordinary_base_profile is not None:
+        ordinary_base_turn = _fit_turn_to_corner(
+            corner=(base_station_m, downwind_offset_m),
+            start_heading_rad=math.pi,
+            profile=ordinary_base_profile,
+            start_label="base_turn_start",
+            end_label="base_turn_end",
+        )
     if before_base_profile is not None:
         if spec.make_circle_before_base and not spec.make_270_before_base:
-            latent_270 = _fit_turn_to_corner(
-                corner=(base_station_m, downwind_offset_m),
-                start_heading_rad=math.pi,
-                profile=generate_coordinated_turn_profile(
-                    true_airspeed_mps=speed_mps,
-                    nominal_bank_deg=spec.base_turn_bank_deg,
-                    roll_rate_deg_s=spec.roll_rate_deg_s,
-                    signed_sweep_deg=-270.0,
-                    sample_interval_s=spec.sample_interval_s,
-                ),
-                start_label="before_base_turn_start",
-                end_label="before_base_turn_end",
-            )
-            before_base_turn = _profile_starting_at(
-                start=(latent_270[0].x_m, latent_270[0].y_m),
+            # Keep the normal leg axes: finish the rolling circle exactly at
+            # the ordinary 90-degree turn's tangent entry, then fly that turn.
+            before_base_turn = _fit_profile_ending_at(
+                end=(ordinary_base_turn[0].x_m, ordinary_base_turn[0].y_m),
                 start_heading_rad=math.pi,
                 profile=before_base_profile,
                 start_label="before_base_turn_start",
                 end_label="before_base_turn_end",
             )
+            # The shared point retains the circle-end label.
+            before_base_turn += ordinary_base_turn[1:]
         else:
             before_base_turn = _fit_turn_to_corner(
                 corner=(base_station_m, downwind_offset_m),
@@ -685,16 +674,7 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
                     else None
                 ),
             )
-    else:
-        if ordinary_base_profile is None:
-            raise AssertionError("ordinary Base-turn profile was not generated")
-        ordinary_base_turn = _fit_turn_to_corner(
-            corner=(base_station_m, downwind_offset_m),
-            start_heading_rad=math.pi,
-            profile=ordinary_base_profile,
-            start_label="base_turn_start",
-            end_label="base_turn_end",
-        )
+
     final_turn = _fit_turn_to_corner(
         corner=(base_station_m, 0.0),
         start_heading_rad=3.0 * math.pi / 2.0,

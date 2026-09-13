@@ -426,16 +426,12 @@ class TrafficPatternGeometryTests(unittest.TestCase):
             ):
                 replace(spec, **{field_name: 1})
 
-    def test_all_eighteen_valid_circle_and_make_270_combinations_generate(self) -> None:
+    def test_all_32_circle_and_make_270_combinations_generate(self) -> None:
         for before_downwind in (False, True):
             for make_270_downwind in (False, True):
-                if before_downwind and not make_270_downwind:
-                    continue
                 for middle_downwind in (False, True):
                     for before_base in (False, True):
                         for make_270_base in (False, True):
-                            if before_base and not make_270_base:
-                                continue
                             with self.subTest(
                                 before_downwind=before_downwind,
                                 make_270_downwind=make_270_downwind,
@@ -459,31 +455,31 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                                 }
                                 self.assertEqual(
                                     "before_downwind_circle_complete" in indices,
-                                    before_downwind,
+                                    before_downwind and make_270_downwind,
                                 )
                                 self.assertEqual(
                                     "before_downwind_turn_start" in indices,
-                                    make_270_downwind,
+                                    make_270_downwind or before_downwind,
                                 )
                                 self.assertEqual(
                                     "downwind_turn_start" in indices,
-                                    not make_270_downwind,
+                                    not (make_270_downwind or before_downwind),
                                 )
                                 self.assertEqual(
                                     "before_base_circle_complete" in indices,
-                                    before_base,
+                                    before_base and make_270_base,
                                 )
                                 self.assertEqual(
                                     "before_base_turn_start" in indices,
-                                    make_270_base,
+                                    make_270_base or before_base,
                                 )
                                 self.assertEqual(
                                     "base_turn_start" in indices,
-                                    not make_270_base,
+                                    not (make_270_base or before_base),
                                 )
                                 descent_start = indices[
                                     "before_base_turn_start"
-                                    if make_270_base
+                                    if make_270_base or before_base
                                     else "base_turn_start"
                                 ]
                                 final_end = indices["final_turn_end"]
@@ -746,6 +742,56 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                     -360.0,
                     delta=0.1,
                 )
+
+    def test_circle_only_retains_tangent_ordinary_transitions(self) -> None:
+        for location in ("downwind", "base"):
+            for sample_interval_s in (0.125, 0.25):
+                specs = rjfm_traffic_pattern_specs(
+                    make_circle_before_downwind=location == "downwind",
+                    make_circle_middle_downwind=False,
+                    make_circle_before_base=location == "base",
+                    make_270_before_downwind=False,
+                    make_270_before_base=False,
+                    sample_interval_s=sample_interval_s,
+                )
+                for spec in specs:
+                    with self.subTest(location=location, name=spec.name,
+                                      sample_interval_s=sample_interval_s):
+                        points = generate_traffic_pattern(spec).points()
+                        indices = {p.label: i for i, p in enumerate(points) if p.label}
+                        start = indices[f"before_{location}_turn_start"]
+                        circle_end = indices[f"before_{location}_turn_end"]
+                        # The circle endpoint also starts the ordinary turn.
+                        turn_end = indices[f"{location}_turn_end"]
+                        for first, last, sweep in (
+                            (start, circle_end, -360.0),
+                            (circle_end, turn_end, 90.0),
+                        ):
+                            self.assertAlmostEqual(
+                                _recovered_coordinate_sweep_deg(tuple(
+                                    _local_coordinates(spec, p)
+                                    for p in points[first:last + 1]
+                                )), sweep, delta=0.1,
+                            )
+                        # Signed local heading differences catch both diagonal
+                        # connectors and reversed (180-degree) tangencies.
+                        for index in (start, circle_end, turn_end):
+                            before = _heading_between(spec, points[index - 1], points[index])
+                            after = _heading_between(spec, points[index], points[index + 1])
+                            delta = (after - before + math.pi) % math.tau - math.pi
+                            self.assertAlmostEqual(math.degrees(delta), 0.0, delta=0.1)
+                        outbound = math.pi if location == "downwind" else 1.5 * math.pi
+                        heading = _heading_between(spec, points[turn_end], points[turn_end + 1])
+                        delta = (heading - outbound + math.pi) % math.tau - math.pi
+                        self.assertAlmostEqual(math.degrees(delta), 0.0, delta=0.1)
+                        # Every point in both turns is sampled: a long chord
+                        # cannot hide between the circle and ordinary rollout.
+                        max_step = knots_to_metres_per_second(spec.true_airspeed_kt) * sample_interval_s
+                        for first, second in pairwise(points[start:turn_end + 1]):
+                            self.assertLessEqual(
+                                _horizontal_path_length_m(spec, (first, second)),
+                                max_step + 0.01,
+                            )
 
     def test_location_specific_turn_banks_control_circle_and_270_profiles(self) -> None:
         spec = rjfm_traffic_pattern_specs(
