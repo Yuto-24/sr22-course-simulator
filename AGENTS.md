@@ -1,275 +1,156 @@
 # AGENTS.md
 
-This file defines project rules for AI coding agents and human contributors. Treat these rules as design constraints unless the repository owner explicitly changes them.
+This file is the compact operating guide for coding agents working in this repository. Keep it short, stable, and focused on constraints that are hard to infer from code. Detailed domain rules live under `docs/` and should be read only when relevant to the task.
 
-## 1. Project purpose
+## 1. Default agent behavior
 
-Build an SR22 training-course simulator that connects:
+When the user asks for implementation, carry the task through **inspect → implement → validate → report**. Do not stop after analysis or a plan unless the user explicitly asked only for a plan.
 
-- pilot-relevant flight inputs;
-- Aviation College training-procedure narrative;
-- SR22 approved performance data;
-- wind and atmosphere;
-- geometric Reference Paths;
-- NAV calculations.
+Use the current task / Issue / PR as the task-specific source of truth. Treat this file as the repository-wide default. If an explicit repository-owner instruction conflicts with a default here, follow the explicit instruction. If two authoritative requirements genuinely conflict, surface the conflict instead of silently choosing one.
 
-The normal flight-input abstraction is:
+Prefer initiative over unnecessary clarification:
 
-- `Pitch`
-- `Bank`
-- `PWR`
-- `Flap`
+- make low-risk, reversible implementation choices yourself;
+- ask only when missing information would materially change behavior, data semantics, public API, or operational correctness;
+- if several independent questions are required, ask them together;
+- do not ask downstream design questions before the upstream decision they depend on is resolved;
+- do not repeatedly ask for confirmation once the user has already established a rule or preference.
 
-Do **not** turn the project into a full 6-DoF simulator unless explicitly requested.
+Keep scope tight:
 
-## 2. Critical source rule: do not build maneuvers from Reference Data tables
+- solve the requested problem, including necessary tests and documentation;
+- reuse existing code, libraries, helpers, and project patterns before writing new machinery;
+- do not introduce abstractions, compatibility layers, frameworks, or generic infrastructure without a concrete current need;
+- do not mix unrelated cleanup into the same change unless it is required for correctness;
+- prefer the smallest design that remains clear and extensible for already-known requirements.
 
-This rule is mandatory.
+For repository changes, do not push directly to `main` unless explicitly instructed. Prefer a branch + PR. Never merge a PR unless the user explicitly asks for the merge.
 
-The Chapter 4 / Chapter 5 end-of-chapter `Reference Data` tables in the Aviation College student training procedures are **not the primary definition of a maneuver and are not the aircraft-model baseline**.
+Do not use sub-agents / sub-threads by default. If an independent review capability is available, it may be used for a non-trivial final review. Review should be independent from the implementation when practical. If independent review is unavailable, state that rather than pretending it occurred.
 
-The training document states that Pitch and Power are approximate values for obtaining the desired flight parameters and change with weight and external environment. The Reference Data section likewise states that Pitch / Power are generally values for standard-atmosphere conditions, vary with weight, temperature and altitude, and should not be chased by instrument fixation.
+## 2. Read before changing
 
-Therefore:
+Before editing, inspect the relevant existing implementation and nearby tests. Also read the task's Issue / PR and the minimum relevant documentation.
 
-- read the maneuver narrative/body before implementing the maneuver;
-- derive maneuver targets, control relationships, phases, limits, path relationships and termination conditions from the narrative and applicable general sections;
-- treat `Reference Data` values as advisory/reference values only;
-- never convert sparse Reference Data rows into an aerodynamic/performance surface;
-- never freeze Reference Data Pitch/Power values when the narrative says to maintain another quantity and adjust inputs to achieve it;
-- never use a Reference Data row as the sole definition of a training maneuver.
+Use this map instead of loading every document:
 
-Permitted uses of Reference Data:
+- `docs/architecture.md` — module boundaries and overall architecture.
+- `docs/modeling.md` — aircraft-model assumptions and supported relationships.
+- `docs/maneuver-specification.md` — maneuver semantics, targets, limits, phases, and control relationships.
+- `docs/data-sources.md` — canonical source data, provenance, and interpolation data.
+- `docs/traffic-patterns.md` — airport traffic-pattern / Circle / 270 geometry.
+- `docs/notebook-workflow.md` — Jupyter / Docker workflow and generated artifacts.
+- `docs/validation.md` — numerical and source-validation expectations.
+- `docs/roadmap.md` — current project direction; not a substitute for the active task.
 
-- numerical solver initial guess;
-- UI hint;
-- computed-result comparison;
-- sanity check;
-- source traceability.
+Search existing Issues, PRs, tests, and similar modules before designing a new solution. Reuse prior decisions after verifying that they still match the current code and task.
 
-If a value exists only in Reference Data and not in the governing narrative/performance source, label it `advisory_reference`. Do not silently promote it to `target`, `limit`, `control law`, or `aircraft performance`.
+## 3. Source authority: preserve semantic roles
 
-## 3. Role-based source authority
+Do not use one global source priority for every question. Use the source appropriate to the role.
 
-Do not use one global source priority for every question. Use the source appropriate to the semantic role.
+**Training maneuver procedure / control intent**
 
-### Training maneuver procedure / control intent
+Use the Aviation College student training-procedure narrative and applicable general sections. These define maneuver objective, phases, targets, limits, path relationships, control relationships, and completion criteria where stated.
 
-Primary source:
+**Aircraft performance / limitations**
 
-- Aviation College student training procedures, applicable narrative/body and general sections.
+Use the applicable approved SR22 flight manual / type-certified flight manual / POH data.
 
-This source defines, where stated:
-
-- maneuver objective;
-- phases and sequence;
-- target airspeed/altitude/course/path;
-- which quantity is corrected with Pitch, Power, Bank, etc.;
-- nominal values and limits;
-- minimum training altitude;
-- entry/recovery/completion conditions.
-
-### Aircraft performance and aircraft limitations
-
-Primary source:
-
-- applicable SR22 approved flight manual / type-certified flight manual / POH data.
-
-Chapter 5 performance tables should provide the principal quantitative performance data where their applicability covers the requested state.
-
-### Operational/local rules
+**Operational / local rules**
 
 Use the applicable Aviation College operating procedure, airport procedure, regulation, AIP-derived rule, or other explicitly supplied operational source. Do not infer local procedures from generic aviation knowledge.
 
-### Analytical physics
+**Analytical physics**
 
-Use physics for relationships that are independently defined and do not overwrite source-specific operational rules, including:
+Use physics only for independently defined relationships such as coordinated-turn geometry, wind vectors, coordinate geometry, state integration, and fuel/weight bookkeeping. Physics must not overwrite source-specific operational rules.
 
-- coordinated-turn geometry;
-- vector wind addition;
-- coordinate geometry;
-- state integration;
-- fuel/weight bookkeeping.
+**Calibration / real-flight data**
 
-### Reference Data tables
+May refine an explicitly identified model relationship, but must not silently replace canonical source data, approved limitations, or source-backed procedures.
 
-Advisory only, as described above.
+### Critical rule: Reference Data is advisory
 
-### Calibration / real-flight data
+Chapter-end `Reference Data` tables in the training procedures are **not** the primary maneuver definition and are **not** the aircraft-performance baseline.
 
-May refine an explicitly identified model relationship, but must not erase the canonical source data or silently replace source-backed limits/procedures.
+Do not:
 
-## 4. Preserve the model boundaries
+- define a maneuver solely from a Reference Data row;
+- turn sparse Reference Data into an aerodynamic/performance surface;
+- freeze Pitch / Power values when the narrative says to maintain another quantity and adjust inputs as required;
+- silently promote Reference Data to `target`, `limit`, `control law`, or `aircraft performance`.
+
+Reference Data may be used as `advisory_reference`, solver initialization, UI hints, sanity checks, comparison, and provenance.
+
+## 4. Core model boundaries
 
 Keep these concepts distinct:
 
-- `InitialState`: initial aircraft conditions including position, altitude, heading, airspeed, fuel/loading information.
-- `Environment`: atmosphere and wind. Weight does not belong here.
-- `FlightInput`: Pitch / Bank / PWR / Flap.
-- `AircraftState`: time-varying aircraft quantities such as heading, TAS, GS, altitude, fuel and weight.
-- `ManeuverSpec`: source-derived definition of a training maneuver.
-- `ReferencePath`: desired geometric path independent of wind.
-- `Trajectory`: simulated time-history in an environment.
-- `Goal` / `TerminationCondition`: Target ALT, Target HDG, elapsed time, accumulated turn, position, path intercept, etc.
-- `AdvisoryReference`: chapter-end Reference Data attached for comparison/initialization only.
+- `InitialState`: initial aircraft conditions.
+- `Environment`: atmosphere and wind; **weight does not belong here**.
+- `FlightInput`: `Pitch`, `Bank`, `PWR`, `Flap`.
+- `AircraftState`: time-varying position, heading, TAS, GS, altitude, fuel, weight, etc.
+- `ManeuverSpec`: source-derived maneuver semantics.
+- `ReferencePath`: desired geometric path, independent of wind.
+- `Trajectory`: time-indexed simulated motion in an environment.
+- `Goal` / `TerminationCondition`: completion conditions.
+- `AdvisoryReference`: comparison / initialization data only.
 
-Do not use `HDG` as a routine continuous command merely because an implementation shortcut would make it easier. Heading is normally a state. `Initial HDG` is required where absolute orientation matters; `Target HDG` may be a segment goal.
+Heading is normally state, not a continuous primary control input. `Initial HDG` and `Target HDG` are valid where the task requires them.
 
-## 5. ManeuverSpec is a control problem, not a lookup row
+Current target aircraft is a Cirrus SR22 training aircraft with fixed landing gear. Do not add variable Gear state/input, routine Rudder/beta control, control-surface deflections, or full 6-DoF dynamics without an explicit requirement.
 
-A maneuver implementation should distinguish at least:
+Ordinary maneuvers assume ideal coordinated flight. Forward Slip / intentional sideslip remain out of core scope unless explicitly requested.
 
-- `target`: quantity to maintain/achieve;
-- `limit`: value that must not be exceeded/crossed;
-- `nominal`: normal value that may be adjusted;
-- `initial_setting`: approximate entry/establishment value;
-- `control_relationship`: which flight input corrects which controlled quantity;
-- `path_constraint`: desired ground/reference geometry;
-- `phase`: entry / established / transition / recovery etc.;
-- `termination_condition`;
-- `advisory_reference`.
+## 5. Performance model rules
 
-Do not flatten these concepts into a single numeric configuration.
+Prefer a performance-based / semi-empirical quasi-steady model before inventing aerodynamic derivatives or transient stability models.
 
-Before implementing a new training maneuver, read `docs/maneuver-specification.md` and the governing source narrative.
+For supported POH Chapter 5 data:
 
-## 6. Aircraft configuration assumptions
-
-Current target configuration:
-
-- Cirrus SR22 training aircraft.
-- Fixed landing gear: do not model Gear state/input.
-- Nose wheel pant / fairing is assumed removed at all times.
-- Ordinary maneuvers assume ideal coordinated flight.
-- Rudder / beta is not a routine input.
-- Forward Slip and intentional sideslip are future scope.
-
-Do not add Gear or Rudder fields to core APIs without a requirement that justifies them.
-
-Some supplied training material contains Gear-related fields/procedures. Preserve their provenance when transcribing source material, but do not turn them into variable aircraft state for this target fixed-gear model unless the repository owner explicitly changes this project assumption.
-
-## 7. Weight and fuel are dynamic aircraft state
-
-Do not place `weight` in Environment.
-
-Initial loading/fuel must provide enough information to determine initial aircraft weight. During simulation, when fuel flow is available, propagate:
-
-```text
-remaining fuel -> current fuel mass -> current aircraft weight
-```
-
-The current performance query should receive current weight when weight is a supported variable or correction.
-
-If a performance table applies at a particular weight and no documented correction exists, expose that limitation. Do not invent a weight correction.
-
-## 8. POH interpolation is a primary quantitative modeling method
-
-Multidimensional interpolation of applicable Chapter 5 performance data is a core aircraft-model technique and should be used wherever the source dimensions support the requested quantity.
-
-Requirements:
-
-- canonical source-table nodes reproduce source values;
+- canonical table nodes must reproduce source values;
 - no extrapolation by default;
-- independent variables and units are explicit;
-- canonical source values are stored separately from generated dense grids;
-- generated grids are reproducible;
-- prefer simple multilinear interpolation initially unless evidence supports a different method;
-- combine tables only when definitions, configuration and applicability are compatible;
-- return provenance/model-coverage metadata with queried results.
+- dimensions and units must be explicit;
+- canonical source values stay separate from generated dense grids;
+- generated interpolation products must be reproducible;
+- prefer simple multilinear interpolation unless evidence supports another method;
+- combine tables only when definitions, configuration, and applicability are compatible;
+- preserve provenance / coverage metadata.
 
-POH interpolation is not merely a correction to training Reference Data. It is the primary quantitative performance provider for supported operating regions.
+A smooth interpolation surface does not prove support for every arbitrary `Pitch × Bank × PWR × Flap` transient state.
 
-However, do not claim that a smooth POH surface automatically defines every arbitrary `Pitch x Bank x PWR x Flap` transient state. Respect what the published tables actually parameterize.
+If a requested operating point cannot be justified by approved performance data, procedure narrative, analytical physics, or an explicitly documented assumption/calibration, return or raise an explicit unsupported/model-gap result. Do not manufacture plausible-looking behavior to hide the gap.
 
-## 9. Unsupported operating regions must stay explicit
+## 6. ReferencePath, airport geometry, and NAV conventions
 
-The public `FlightInput` API may remain `Pitch / Bank / PWR / Flap` even if the quantitative response model initially supports only part of that space.
+`ReferencePath` is desired ground geometry. Wind must not translate or deform it. Keep ReferencePath and Trajectory independently displayable.
 
-When a requested combination cannot be justified by POH data, narrative procedure, analytical physics, or an explicitly documented calibration/model assumption:
+For airport geometry:
 
-- return/raise an explicit unsupported or model-gap result;
-- document the missing relationship;
-- do not manufacture a physically plausible-looking response;
-- do not use Reference Data to conceal the gap.
+- ARP is reference / sanity-check data only;
+- runway and traffic-pattern geometry originates from the runway thresholds;
+- use `RWY Center Point = midpoint(THR1, THR2)`;
+- use source-backed **True Bearing** to construct runway vectors and left/right normals;
+- preserve Magnetic Variation for display / checks / future use, but do not use it to place KML or ReferencePath coordinates.
 
-Prefer a narrower honest model over a broad undocumented model.
+For traffic-pattern identity, use **ICAO + RWY + LEFT/RIGHT traffic** as the canonical key. Do not use geographic labels such as North/South/East/West as canonical identity. If geographic orientation is useful, derive it from geometry for display only.
 
-## 10. Modeling philosophy
+Unless a task explicitly narrows output, keep both LEFT and RIGHT patterns available for each runway direction. Preferred / normally used traffic side is metadata and must not delete the opposite-side geometry.
 
-Prefer a performance-based / semi-empirical, quasi-steady model first.
+Prefer canonical airport source data under `src/sr22_course_simulator/data/airports/canonical/` instead of re-transcribing the same AIP values into airport-specific Python modules. Preserve source document / effective-date provenance when loading canonical data.
 
-Use:
+For NAV calculations:
 
-- training-procedure narrative for maneuver semantics and control intent;
-- POH performance surfaces for published condition-dependent quantities;
-- analytical physics for coordinated-turn geometry, wind, state propagation and other well-defined relationships;
-- explicit calibration only when introduced, documented and testable;
-- Reference Data only as advisory context.
+- distinguish True vs Magnetic explicitly;
+- meteorological wind direction is FROM;
+- keep Reference Course / Track geometry separate from the wind-corrected Heading needed to fly it;
+- reuse common vector math instead of duplicating navigation formulas.
 
-Do not invent aerodynamic derivatives, control-surface models or transient behavior merely to make simulation output look realistic.
+## 7. Units and provenance
 
-## 11. Reference Path and wind
+Use SI units internally unless there is a strong numerical reason not to. Aviation-facing APIs may use ft, kt, NM, fpm, degrees, and % PWR. Make conversions explicit; never mix degrees/radians or kt/m/s implicitly.
 
-Reference Path is desired ground geometry. Wind must not translate or deform the Reference Path itself.
-
-For path-following work:
-
-```text
-ManeuverSpec / ReferencePath + Environment + AircraftModel
-    -> Guidance
-    -> Pitch / Bank / PWR / Flap
-    -> Trajectory
-```
-
-Always preserve the ability to display Reference Path and Trajectory separately.
-
-For a source-defined ground-reference maneuver, encode the source's path-control method rather than assuming fixed Bank.
-
-### Airport and runway geometry
-
-An Airport Reference Point (ARP) is reference-only. It may be displayed or used
-for a source sanity check, but it must not be used as the origin of runway or
-traffic-pattern geometry because it may not lie on the runway centerline.
-
-For every airport, define each runway geometry origin as:
-
-```text
-RWY Center Point = (RWY THR1 + RWY THR2) / 2
-```
-
-Build runway vectors and left/right normals from the source-backed True Bearing,
-and resolve airport traffic-pattern geometry from the RWY Center Point. Preserve
-Magnetic Variation as airport master data for display, checks and future use;
-do not use it to place KML or Reference Path coordinates.
-
-## 12. NAV conventions
-
-Use a common vector implementation for simulation and NAV calculations.
-
-- Explicitly distinguish True and Magnetic references.
-- Meteorological wind direction is FROM direction.
-- For wind-corrected Cut Angle work, treat the geometric cut as desired ground track relative to the reference course unless the governing source defines otherwise.
-- Solve the heading required to produce that track under wind.
-- Keep Reference Course / Track geometry separate from the wind-corrected Heading required to fly it.
-
-## 13. Units
-
-Use SI units internally unless there is a strong numerical reason not to.
-
-Aviation-facing interfaces may use:
-
-- ft
-- kt
-- NM
-- fpm
-- degrees
-- % PWR
-
-Keep conversion boundaries explicit. Do not mix degrees/radians or knots/m/s implicitly.
-
-## 14. Provenance and semantic labels
-
-Source-backed or modeled values should retain enough metadata to distinguish:
+Preserve enough metadata to distinguish at least:
 
 - `procedure_target`
 - `procedure_limit`
@@ -283,137 +164,61 @@ Source-backed or modeled values should retain enough metadata to distinguish:
 - `assumed`
 - `unsupported`
 
-A numerically smooth answer must not obscure the strength or meaning of its evidence.
+A numerically smooth result must not obscure the strength or meaning of its evidence.
 
-## 15. Testing requirements
+## 8. Testing and validation
 
-Every numerical feature should have deterministic tests.
+Every numerical feature needs deterministic tests. A plot that merely looks reasonable is not a test.
 
-At minimum preserve tests for:
+At minimum, preserve coverage for the relevant subset of:
 
 - no-wind straight flight;
 - canonical wind-vector directions;
-- constant-bank turn against the analytical model;
-- altitude propagation for analytically known cases;
+- coordinated / constant-bank turns against analytical expectations;
+- altitude propagation for known cases;
 - fuel burn and weight reduction;
 - exact POH table-node reproduction;
-- out-of-domain interpolation rejection;
-- Reference Path geometry independent of simulation;
-- KML coordinate/altitude ordering;
-- maneuver narrative transcription/semantics;
-- source precedence: narrative procedure must not be overridden by advisory Reference Data;
-- target/limit/initial-setting semantic separation.
+- rejection of unsupported interpolation / extrapolation;
+- ReferencePath independence from wind;
+- runway / traffic-pattern geometry and semantic points;
+- KML coordinate and altitude ordering;
+- maneuver-source transcription and semantic roles;
+- source precedence: procedure narrative must not be overridden by advisory Reference Data.
 
-A plot that looks reasonable is not a test.
+After implementation:
 
-## 16. Code organization
+1. run focused tests for the changed behavior;
+2. run the broader test suite when practical;
+3. run formatting / lint / type checks that the repository already uses;
+4. run `git diff --check` when working in Git;
+5. if Notebook behavior changed, execute the relevant notebook workflow when practical.
 
-Prefer small domain-specific modules over one large simulator file, but do not create empty architecture for its own sake.
+Never claim a validation passed unless it was actually run. If environment/tooling prevents a check, report the exact unverified item.
 
-Keep these separately represented:
+## 9. Documentation and reusable knowledge
 
-- canonical source data;
-- training maneuver specifications;
-- advisory Reference Data;
-- POH performance data;
-- generated interpolation products;
-- simulation outputs.
+Update docs when a change affects a model assumption, public behavior, source provenance, supported/unsupported region, or user workflow.
 
-Avoid hidden global state. Simulation results should use a dedicated result / trajectory object rather than loose arrays when practical.
+Record reusable knowledge when it would materially shorten or improve future work, especially:
 
-## 17. Documentation obligations
+- non-obvious design decisions and rationale;
+- root causes and recurrence prevention;
+- failed approaches and why they failed;
+- repository-specific constraints;
+- reusable implementation patterns;
+- verification results that change future decisions.
 
-When changing a fundamental model assumption, update the relevant files under `docs/` and this `AGENTS.md` when the agent rule itself changes.
+Do not turn `AGENTS.md` into a work log. Raw logs, one-off observations, and facts obvious from code belong elsewhere or nowhere. Keep this file as a compact map of stable constraints.
 
-When adding a maneuver:
+## 10. Completion and reporting
 
-- document the narrative source section;
-- encode semantic roles of values;
-- document model gaps;
-- keep any Reference Data row advisory.
+A code task is complete only when the requested behavior is implemented, relevant tests are added/updated, validation has been run as far as the environment allows, and documentation is updated where required.
 
-When adding source-backed performance data, document provenance and applicability.
+Final responses should be concise. Report:
 
-When knowingly using an approximation, name it and document its limitation.
+- what changed;
+- validation run and result;
+- any remaining limitation / unverified item;
+- PR / commit reference when applicable.
 
-## 18. Current implementation priority
-
-Unless a task says otherwise, prioritize work in this order:
-
-1. common state / units / wind / fuel-weight conventions;
-2. maneuver-source schema and narrative `ManeuverSpec` extraction;
-3. canonical POH Chapter 5 data ingestion and multidimensional interpolation;
-4. explicit model-coverage handling for supported/unsupported operating regions;
-5. Spiral Descent practical 3D forward simulation and procedure-driven guidance;
-6. KML export;
-7. reusable maneuver/path segments;
-8. calm/wind training-maneuver trajectories;
-9. airport traffic-pattern Reference Paths;
-10. NAV / Cut Angle solver;
-11. forecast-wind integration;
-12. real-flight-data comparison/calibration.
-
-## 19. Do not silently expand scope
-
-The following are explicitly future scope and should not appear in core APIs prematurely:
-
-- Forward Slip / intentional sideslip;
-- explicit Rudder / beta;
-- control-surface deflections;
-- full 6-DoF equations;
-- detailed transient stability/control models;
-- pilot neuromuscular/control-loop simulation.
-
-If one becomes necessary, propose the smallest compatible extension instead of restructuring the whole project without discussion.
-
-## プラン実施時のルール
-
-5.6 Sol はオーケストレーターとして振舞い、原則として実装はしないでください。
-実装・調査・テストには必要に応じて Sub Agent / Sub Thread を使用し、Terra、Luna、5.4 を適切に割り当ててください。
-
-Review は実装を担当したモデルとは独立したモデルが実施してください。
-同一モデルによる自己 Review のみで完了としてはいけません。
-
-## 過去知識の再利用
-
-新しい作業に着手する前に、Repository 内の AGENTS.md、docs、Issue、PR、過去の設計判断、既知の失敗、類似実装など、利用可能な既存知識を確認してください。
-
-既に解決済みの問題について、不要な再調査・再実装・同じ失敗を繰り返さないでください。
-可能な限り、過去に到達した地点を今回の作業の開始地点としてください。
-
-過去の知識は無条件に適用せず、現在のコード・仕様・依存関係との差分を確認してから利用してください。
-
-## 作業から得た知識の保存
-
-作業中に、将来の類似タスクにおける判断を変えうる知見を得た場合は、その場限りで失わず、適切な場所へ記録してください。
-
-特に以下は再利用可能な知識として扱ってください。
-
-- 非自明な設計判断とその理由
-- Root cause とその根拠
-- 失敗したアプローチと失敗理由
-- 有効だった修正方法
-- 再発防止策
-- Repository 固有の制約・慣習
-- 複数箇所・複数タスクで再利用可能な実装パターン
-- 今後の調査や判断を短縮できる検証結果
-
-Raw log、単なる作業履歴、コードから容易に読み取れる内容、既存情報の重複は原則として知識として保存しないでください。
-
-## 知識の一般化
-
-一度だけ観測された事象を、直ちに一般ルールとして扱わないでください。
-
-まず案件固有の Observation / Learning として保持し、別の箇所や別のタスクでも同じ構造が確認された場合に Pattern として一般化してください。
-
-十分な再現性と根拠が確認されたもののみ、Repository 全体または今後の作業に適用する Rule へ昇格してください。
-
-既存ルールと矛盾する新しい証拠が得られた場合は、古いルールをそのまま維持せず、根拠を確認して更新してください。
-
-## コンテキスト管理
-
-AGENTS.md や常時読み込む指示には、すべての知識を詰め込まないでください。
-
-常時必要なルールは小さく保ち、詳細な設計判断、過去の失敗、検証結果、類似事例などは外部のドキュメントとして保持し、必要になった時だけ参照してください。
-
-新しい情報を常時ルールへ追加する前に、「毎回の作業で本当に必要か」を判断してください。
+Do not dump internal reasoning or repeat the entire task specification.
