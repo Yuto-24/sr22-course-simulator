@@ -39,7 +39,6 @@ from sr22_course_simulator.examples.miyazaki_traffic_patterns import (
 from sr22_course_simulator.export import KmlPathStyle, reference_paths_to_kml
 from sr22_course_simulator.geometry import displace_position, distance_m, enu_displacement
 from sr22_course_simulator.path import (
-    PatternLabel,
     PatternSide,
     aiming_marker_distance_m,
     aiming_marker_elevation_ft,
@@ -163,7 +162,7 @@ class AipMasterDataTests(unittest.TestCase):
     def test_runway_rejects_source_geometry_mismatches(self) -> None:
         runway = RJFM.runway("09")
         with self.assertRaisesRegex(ValidationError, "threshold geometry"):
-            replace(runway, true_bearing_deg=runway.true_bearing_deg + 0.2)
+            replace(runway, true_bearing_deg=runway.true_bearing_deg + 0.6)
         with self.assertRaisesRegex(ValidationError, "threshold geometry"):
             replace(runway, declared_length_m=runway.declared_length_m + 16.0)
 
@@ -222,15 +221,15 @@ class TrafficPatternGeometryTests(unittest.TestCase):
 
     def test_four_direction_and_side_combinations_are_explicit(self) -> None:
         combinations = tuple(
-            (spec.runway.designation, spec.label, spec.side) for spec in self.specs
+            (spec.runway.designation, spec.side) for spec in self.specs
         )
         self.assertEqual(
             combinations,
             (
-                ("09", PatternLabel.NORTH, PatternSide.LEFT),
-                ("09", PatternLabel.SOUTH, PatternSide.RIGHT),
-                ("27", PatternLabel.NORTH, PatternSide.RIGHT),
-                ("27", PatternLabel.SOUTH, PatternSide.LEFT),
+                ("09", PatternSide.LEFT),
+                ("09", PatternSide.RIGHT),
+                ("27", PatternSide.RIGHT),
+                ("27", PatternSide.LEFT),
             ),
         )
 
@@ -244,6 +243,7 @@ class TrafficPatternGeometryTests(unittest.TestCase):
             "before_downwind_turn_end",
             "middle_downwind_turn_start",
             "middle_downwind_circle_complete",
+            "abeam_threshold",
             "before_base_turn_start",
             "before_base_turn_end",
             "final_turn_start",
@@ -348,7 +348,7 @@ class TrafficPatternGeometryTests(unittest.TestCase):
                         else:
                             self.assertEqual(
                                 point_indices["before_base_turn_start"],
-                                point_indices["before_downwind_turn_end"] + 1,
+                                point_indices["before_downwind_turn_end"] + 2,
                             )
 
                         half_runway = spec.runway.measured_length_m / 2.0
@@ -1108,13 +1108,13 @@ class TrafficPatternGeometryTests(unittest.TestCase):
             self.assertAlmostEqual(final_end[1], 0.0, delta=0.3)
 
     def test_reciprocal_crosswind_and_base_share_each_physical_line(self) -> None:
-        by_direction_and_label = {
-            (spec.runway.designation, spec.label): (spec, _labeled_points(path))
+        by_direction_and_side = {
+            (spec.runway.designation, spec.side): (spec, _labeled_points(path))
             for spec, path in zip(self.specs, self.paths, strict=True)
         }
-        for label in PatternLabel:
-            runway_09, rwy09 = by_direction_and_label[("09", label)]
-            runway_27, rwy27 = by_direction_and_label[("27", label)]
+        for side in PatternSide:
+            runway_09, rwy09 = by_direction_and_side[("09", side)]
+            runway_27, rwy27 = by_direction_and_side[("27", PatternSide.RIGHT if side is PatternSide.LEFT else PatternSide.LEFT)]
             # The far/downwind endpoint is shared exactly.  The near/runway
             # endpoints differ because the 30-degree Crosswind and 25-degree
             # Final turns have different tangent displacements, but their
@@ -1147,7 +1147,7 @@ class TrafficPatternGeometryTests(unittest.TestCase):
         for spec, path in zip(self.specs, self.paths, strict=True):
             point = _labeled_points(path)["middle_downwind_turn_start"].position
             _, north_m = enu_displacement(center, point)
-            if spec.label is PatternLabel.NORTH:
+            if (spec.runway.designation == "09") == (spec.side is PatternSide.LEFT):
                 self.assertGreater(north_m, 0.0)
             else:
                 self.assertLess(north_m, 0.0)
@@ -1691,7 +1691,7 @@ class TrafficPatternKmlTests(unittest.TestCase):
             self.assertEqual(
                 tuple(path.name for path in written),
                 tuple(
-                    f"RJFM_RWY{spec.runway.designation}_{spec.label.value.upper()}_MAKE_CIRCLES.kml"
+                    f"RJFM_RWY{spec.runway.designation}_{spec.side.value.upper()}_MAKE_CIRCLES.kml"
                     for spec in specs
                 ),
             )

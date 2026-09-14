@@ -314,8 +314,9 @@ data/
 │   ├── metadata/
 │   └── derived/            # optional reproducible caches, never canonical
 └── airports/
-    ├── rjfm.py
-    └── ...
+    ├── canonical/*.json  # supplied AIP source records
+    ├── loader.py         # shared runtime loader
+    └── rjfm.py           # RJFM export resolved through the loader
 ```
 
 Do not commit generated dense grids as if they were canonical source data.
@@ -407,11 +408,15 @@ The current Chapter 5 has no descent-performance table covering 110 kt, approxim
 
 ### 14.3 RJFM airport and runway data
 
-The task supplied a transcription from `RJFM__20260301.pdf`, effective
-2026-03-01, for RJFM AD 2.2 and AD 2.12. The raw PDF was not present in the
-checkout or task attachment directory during implementation, so the canonical
-Python record explicitly says `task-provided transcription` rather than
-claiming independent PDF verification.
+The eight supplied canonical AIP JSON records are loaded by
+`data.airports.load_airport`; RJFM now uses that loader as well. The old RJFM
+Python transcription is removed, with numerical parity tests retaining its
+values. Each `SourceCitation` preserves the source filename, SHA-256, PDF/AIP
+page, section and that section's effective date. For RJFM, AD 2.2 is dated
+2026-03-01 and AD 2.12 is dated 2025-05-15. File naming does not supersede the
+section dates. Loading the supplied JSON does not claim fresh PDF verification.
+Missing source fields are explicit model gaps. AIP local/IFR restrictions are
+not inferred into VFR operational profiles by this loader.
 
 The record includes ARP, airport elevation, Magnetic Variation and annual
 change, directional runway True Bearings, dimensions, threshold positions and

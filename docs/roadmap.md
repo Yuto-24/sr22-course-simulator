@@ -17,7 +17,7 @@ Completed in the first package version:
 - KML and optional plotting helpers;
 - reusable Airport/Runway master data with ARP reference-only semantics and
   threshold-derived RWY Center Point;
-- RJFM RWY09/RWY27 NORTH/SOUTH Make-Circle Reference Paths, Notebook and
+- RJFM RWY09/RWY27 LEFT/RIGHT Make-Circle Reference Paths, Notebook and
   individual/combined Google Earth altitude KML export;
 - deterministic numerical/source-semantic tests.
 
@@ -192,12 +192,14 @@ Do not add a maneuver merely by copying its Reference Data row.
 
 - [x] define reusable AIP-derived Airport/Runway master data and deterministic DMS ingestion;
 - [x] define RWY Center Point from reciprocal thresholds without using ARP as a geometry origin;
-- [x] implement RJFM RWY09/RWY27 NORTH/SOUTH Make-Circle Reference Paths from supplied local dimensions;
+- [x] implement RJFM RWY09/RWY27 LEFT/RIGHT Make-Circle Reference Paths from supplied local dimensions;
 - [x] derive turn radius from 110 KTAS and Bank, including 10 deg/s Roll transitions;
 - [x] connect Base descent to a 3-degree Final ending at the runway-length-dependent Aiming Marker;
 - [x] export four individual and one multi-Placemark Google Earth altitude-wall KML;
 - [x] add verbatim task-provided RJFM Short Downwind and RWY27 Entry geometry plus a tangent 110 KTAS / 22-degree Circle;
-- [ ] transcribe and validate other target airports (RJFO, RJFK, RJFT, RJFS, RJFU, RJFG, RJFC);
+- [x] load and validate canonical AIP geometry for RJFM and the seven other target airports (RJFO, RJFK, RJFT, RJFS, RJFU, RJFG, RJFC);
+- [x] support per-runway LEFT/RIGHT profiles and Abeam / Base-turn-start / Base-turn-end descent semantics;
+- [ ] add the seven other airports' operational profiles and individual/combined KML generation (Issue #9);
 - generate wind-corrected guidance required to maintain the same ground path;
 - support airport-specific procedures as data rather than hard-coded special cases where practical;
 - keep path geometry separate from aircraft trajectory.
