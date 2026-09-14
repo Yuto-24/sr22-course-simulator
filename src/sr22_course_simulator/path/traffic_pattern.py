@@ -35,11 +35,12 @@ class PatternSide(StrEnum):
     RIGHT = "right"
 
 
-class PatternLabel(StrEnum):
-    """Geographic display label for a pattern."""
+class DescentStart(StrEnum):
+    """Procedure-selected point at which the pattern begins descending."""
 
-    NORTH = "north"
-    SOUTH = "south"
+    ABEAM_THRESHOLD = "abeam_threshold"
+    BASE_TURN_START = "base_turn_start"
+    BASE_TURN_END = "base_turn_end"
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,11 +86,13 @@ class TrafficPatternSpec:
     airport: AirportSpec
     runway: RunwaySpec
     side: PatternSide
-    label: PatternLabel
     altitude_ft: float
     downwind_offset_nm: float
     crosswind_base_extension_nm: float
     source: SourceCitation
+    descent_start: DescentStart = DescentStart.BASE_TURN_START
+    preferred: bool = False
+    notes: tuple[str, ...] = ()
     true_airspeed_kt: float = 110.0
     normal_bank_deg: float = 30.0
     final_bank_deg: float = 25.0
@@ -113,8 +116,15 @@ class TrafficPatternSpec:
             raise ValidationError("traffic-pattern runway must belong to its airport")
         if not isinstance(self.side, PatternSide):
             raise ValidationError("traffic-pattern side must be PatternSide")
-        if not isinstance(self.label, PatternLabel):
-            raise ValidationError("traffic-pattern label must be PatternLabel")
+        if not isinstance(self.descent_start, DescentStart):
+            raise ValidationError("traffic-pattern descent_start must be DescentStart")
+        if not isinstance(self.preferred, bool):
+            raise ValidationError("traffic-pattern preferred must be bool")
+        if isinstance(self.notes, str) or not isinstance(self.notes, (tuple, list)):
+            raise ValidationError("traffic-pattern notes must be a sequence of text")
+        if any(not isinstance(note, str) or not note.strip() for note in self.notes):
+            raise ValidationError("traffic-pattern notes must contain nonempty text")
+        object.__setattr__(self, "notes", tuple(self.notes))
         if not isinstance(self.source, SourceCitation):
             raise ValidationError("traffic-pattern source must be a SourceCitation")
         for field_name in (
@@ -164,7 +174,7 @@ class TrafficPatternSpec:
 
         return (
             f"{self.airport.icao} RWY{self.runway.designation} "
-            f"{self.label.value.upper()} Traffic Pattern with Make Circles"
+            f"{self.side.value.upper()} Traffic Pattern with Make Circles"
         )
 
     @property
@@ -717,14 +727,28 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
     _append_segment(local_points, departure_turn)
     _append_straight(local_points, downwind_entry_turn[0])
     _append_segment(local_points, downwind_entry_turn)
+
+    def append_downwind_straight(target: _LocalPoint) -> None:
+        previous = local_points[-1]
+        # Include shared endpoints despite roundoff in fitted turn coordinates.
+        if previous.x_m + 1e-7 >= landing_station_m >= target.x_m - 1e-7:
+            local_points.append(
+                _LocalPoint(landing_station_m, downwind_offset_m, "abeam_threshold")
+            )
+            # Shared points have distinct semantic roles; preserve the target
+            # label even when the straight/segment append helpers deduplicate.
+            local_points.append(target)
+        else:
+            _append_straight(local_points, target)
+
     if middle_downwind_turn:
-        _append_straight(local_points, middle_downwind_turn[0])
+        append_downwind_straight(middle_downwind_turn[0])
         _append_segment(local_points, middle_downwind_turn)
     if before_base_turn:
-        _append_straight(local_points, before_base_turn[0])
+        append_downwind_straight(before_base_turn[0])
         _append_segment(local_points, before_base_turn)
     else:
-        _append_straight(local_points, ordinary_base_turn[0])
+        append_downwind_straight(ordinary_base_turn[0])
         _append_segment(local_points, ordinary_base_turn)
     _append_straight(local_points, final_turn[0])
     _append_segment(local_points, final_turn)
@@ -736,13 +760,28 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
 
     labels = {point.label: index for index, point in enumerate(local_points) if point.label}
     upwind_turn_start = labels["departure_turn_start"]
-    descent_start = labels[
+    base_start_label = (
         "before_base_turn_end"
         if spec.make_circle_before_base and not spec.make_270_before_base
         else "before_base_turn_start"
         if spec.make_270_before_base
         else "base_turn_start"
-    ]
+    )
+    descent_label = (
+        "abeam_threshold"
+        if spec.descent_start is DescentStart.ABEAM_THRESHOLD
+        else "before_base_turn_end"
+        if spec.descent_start is DescentStart.BASE_TURN_END and spec.make_270_before_base
+        else "base_turn_end"
+        if spec.descent_start is DescentStart.BASE_TURN_END
+        else base_start_label
+    )
+    if descent_label not in labels:
+        raise ValidationError(
+            f"{spec.name}: model gap: {descent_label} requires a straight Downwind "
+            "crossing the landing-threshold station outside optional turns"
+        )
+    descent_start = labels[descent_label]
     final_rollout = labels["final_turn_end"]
     cumulative = [0.0]
     for previous, current in zip(local_points, local_points[1:]):
@@ -756,8 +795,13 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
         aiming_station_m - local_points[final_rollout].x_m
     ) * glide_slope
     if final_rollout_altitude_m >= pattern_altitude_m:
-        raise ValidationError("pattern altitude must be above the computed final rollout altitude")
+        raise ValidationError(
+            "model gap: pattern altitude must be above the computed final rollout altitude; "
+            "the selected altitude, runway elevation and Final geometry do not permit descent"
+        )
     descent_distance = cumulative[final_rollout] - cumulative[descent_start]
+    if descent_distance <= 0.0:
+        raise ValidationError("model gap: descent start must precede Final rollout along the path")
 
     climb_distance = cumulative[upwind_turn_start]
     if climb_distance <= 0.0:
@@ -806,7 +850,7 @@ def generate_traffic_pattern(spec: TrafficPatternSpec) -> PolylineReferencePath:
 def _component_name(spec: TrafficPatternSpec, component: str) -> str:
     return (
         f"{spec.airport.icao} RWY{spec.runway.designation} "
-        f"{spec.label.value.upper()} {component}"
+        f"{spec.side.value.upper()} {component}"
     )
 
 
@@ -984,6 +1028,7 @@ def _insert_point_at_along_distance(
                 )
             )
         elif math.isclose(distance_m, next_accumulated_m, abs_tol=1e-9):
+            inserted.append(current)
             inserted.append(_LocalPoint(current.x_m, current.y_m, label))
             accumulated_m = next_accumulated_m
             continue
@@ -999,10 +1044,13 @@ def _component_with_altitudes(
     local_points: tuple[_LocalPoint, ...],
     descent_distance_m: float | None = None,
     merge_altitude_m: float | None = None,
+    branch_altitude_m: float | None = None,
 ) -> PolylineReferencePath:
     """Build a component, optionally descending over its final horizontal length."""
 
-    pattern_altitude_m = feet_to_metres(spec.altitude_ft)
+    pattern_altitude_m = (
+        feet_to_metres(spec.altitude_ft) if branch_altitude_m is None else branch_altitude_m
+    )
     if descent_distance_m is None:
         return _constant_altitude_component(spec, name=name, local_points=local_points)
     if merge_altitude_m is None:
@@ -1279,36 +1327,69 @@ def generate_traffic_pattern_components(
         normal_base_turn = tuple(
             _LocalPoint(*_local_coordinates_from_path_point(spec, point))
             for point in base.points()[
-                base_label_indices["base_turn_start"] : base_label_indices["base_turn_end"]
-                + 1
+                base_label_indices["base_turn_start"] : base_label_indices["base_turn_end"] + 1
             ]
         )
-        components.append(
-            _component_with_altitudes(
+        alternative = _outside_270_component_local_points(
+            branch=normal_base_turn[0],
+            merge=normal_base_turn[-1],
+            corner=(base_station_m, downwind_offset_m),
+            start_heading_rad=math.pi,
+            profile=base_270_profile,
+            branch_label="before_base_branch",
+            turn_start_label="before_base_turn_start",
+            turn_end_label="before_base_turn_end",
+            merge_label="before_base_merge",
+        )
+        name = _component_name(spec, "Before Base 270")
+        if spec.descent_start is DescentStart.BASE_TURN_END:
+            # The 270 rolls out before the ordinary Base-turn endpoint. A
+            # descent from that rollout cannot rejoin a still-level normal
+            # endpoint without climbing. Continue on the existing Base/Final
+            # geometry and rejoin in 3D at Final rollout instead.
+            tail = tuple(
+                _LocalPoint(*_local_coordinates_from_path_point(spec, point), point.label)
+                for point in base.points()[
+                    base_label_indices["base_turn_end"] + 1 : base_label_indices["final_turn_end"] + 1
+                ]
+            )
+            alternative += tail
+            rollout_index = next(
+                i for i, point in enumerate(alternative) if point.label == "before_base_turn_end"
+            )
+            component = _component_with_altitudes(
                 spec,
-                name=_component_name(spec, "Before Base 270"),
-                local_points=_outside_270_component_local_points(
-                    branch=_LocalPoint(
-                        *_local_coordinates_from_path_point(
-                            spec, base_labels["base_turn_start"]
-                        )
+                name=name,
+                local_points=alternative,
+                descent_distance_m=_horizontal_polyline_length(alternative[rollout_index:]),
+                merge_altitude_m=base_labels["final_turn_end"].altitude_m,
+            )
+            component = replace(
+                component,
+                citation=replace(
+                    spec.source,
+                    notes=spec.source.notes + (
+                        "BASE_TURN_END 270 descends from actual 270 rollout to Final rollout; "
+                        "ordinary Base merge is horizontal only; vertical rejoin occurs at Final rollout",
                     ),
-                    merge=_LocalPoint(
-                        *_local_coordinates_from_path_point(
-                            spec, base_labels["base_turn_end"]
-                        )
-                    ),
-                    corner=(base_station_m, downwind_offset_m),
-                    start_heading_rad=math.pi,
-                    profile=base_270_profile,
-                    branch_label="before_base_branch",
-                    turn_start_label="before_base_turn_start",
-                    turn_end_label="before_base_turn_end",
-                    merge_label="before_base_merge",
                 ),
-                descent_distance_m=_horizontal_polyline_length(normal_base_turn),
+            )
+        else:
+            # Abeam descent has already begun on the shared Downwind: connect
+            # its branch and merge heights over this alternative's own length.
+            # The default retains PR #7's final ordinary-turn-length descent.
+            abeam = spec.descent_start is DescentStart.ABEAM_THRESHOLD
+            component = _component_with_altitudes(
+                spec,
+                name=name,
+                local_points=alternative,
+                descent_distance_m=(
+                    _horizontal_polyline_length(alternative) if abeam
+                    else _horizontal_polyline_length(normal_base_turn)
+                ),
+                branch_altitude_m=base_labels["base_turn_start"].altitude_m if abeam else None,
                 merge_altitude_m=base_labels["base_turn_end"].altitude_m,
             )
-        )
+        components.append(component)
 
     return tuple(components)

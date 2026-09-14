@@ -518,3 +518,15 @@ The multi-stage `Dockerfile` has a dependency-free runtime target and a separate
 ### 9.4 Coordinate and integration method
 
 The initial integrator uses fixed time steps, midpoint heading for horizontal displacement, and a short-distance spherical local-tangent geographic approximation. It linearly interpolates a threshold-crossing final state so an altitude safety boundary is not numerically overshot. Heading is wrapped only for state display; `accumulated_turn_rad` remains unwrapped for 720-degree termination.
+
+## Multi-airport Traffic Pattern boundary
+
+`data.airports.load_airport` resolves the eight bundled canonical AIP JSON
+records into the existing `AirportSpec` / `RunwaySpec` objects. AIP geometry
+and section-specific citations remain separate from the operational values in
+`TrafficPatternSpec`. The latter is keyed by ICAO, runway direction and
+`PatternSide.LEFT/RIGHT`; altitude, leg dimensions, semantic `DescentStart`,
+preferred metadata and notes are per pattern. No registry or airport-specific
+copy of the geometry engine is required. The existing independent component
+builder remains the KML-facing API. See `traffic-patterns.md` for the different
+horizontal/vertical rejoin points of a Base-turn-end 270 alternative.

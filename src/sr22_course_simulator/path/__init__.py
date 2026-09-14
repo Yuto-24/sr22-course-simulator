@@ -13,7 +13,7 @@ from sr22_course_simulator.path.short_downwind import (
 )
 from sr22_course_simulator.path.traffic_pattern import (
     CoordinatedTurnProfile,
-    PatternLabel,
+    DescentStart,
     PatternSide,
     TrafficPatternSpec,
     TurnProfileSample,
@@ -31,7 +31,7 @@ __all__ = [
     "ReferencePath",
     "ShortDownwindCircleSpec",
     "CoordinatedTurnProfile",
-    "PatternLabel",
+    "DescentStart",
     "PatternSide",
     "TrafficPatternSpec",
     "TurnProfileSample",

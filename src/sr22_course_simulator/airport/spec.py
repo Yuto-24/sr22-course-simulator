@@ -22,7 +22,11 @@ _AIP_DMS_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-RUNWAY_BEARING_TOLERANCE_DEG = 0.1
+# Source-consistency check, not a correction to AIP True Bearing. The supplied
+# multi-airport records include whole-degree bearings (RJFO residual ~0.422 deg)
+# and the local spherical coordinate approximation. Keep a bounded half-degree
+# tolerance while retaining both the published bearing and thresholds unchanged.
+RUNWAY_BEARING_TOLERANCE_DEG = 0.5
 RUNWAY_LENGTH_TOLERANCE_M = 15.0
 
 

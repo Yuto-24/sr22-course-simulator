@@ -29,7 +29,7 @@ sr22-rjfm-patterns = "sr22_course_simulator.examples.miyazaki_traffic_patterns:m
 where = ["src"]
 
 [tool.setuptools.package-data]
-sr22_course_simulator = ["data/poh/canonical/*.json"]
+sr22_course_simulator = ["data/poh/canonical/*.json", "data/airports/canonical/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

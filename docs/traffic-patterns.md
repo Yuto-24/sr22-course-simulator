@@ -2,12 +2,36 @@
 
 ## 対象とモデル境界
 
-宮崎空港 RJFM の4本の Traffic Pattern を生成します。
+`TrafficPatternSpec` は空港・滑走路方向・LEFT/RIGHTごとに運用値を保持します。現在の完成済みの空港別 generator は宮崎空港 RJFM の4本です。その他7空港の運用profileとKML一括生成はIssue #9で追加します。
 
-- RWY09 NORTH / SOUTH
-- RWY27 NORTH / SOUTH
+- RWY09 LEFT / RIGHT
+- RWY27 LEFT / RIGHT
 
-各RWY／NORTH・SOUTHについて、Aiming Markerから同じAiming Markerへ戻る通常場周本体と、選択したCircle／270を別々の`PolylineReferencePath`として生成します。通常場周本体へCircleや270を連結しないため、KMLでは各Placemarkを独立して表示できます。110 KTAS、Bank、Roll rateは曲線形状を構築する入力であり、出力はwindやtime-indexed aircraft dynamicsを含む`Trajectory`ではありません。
+各RWY／LEFT・RIGHTについて、Aiming Markerから同じAiming Markerへ戻る通常場周本体と、選択したCircle／270を別々の`PolylineReferencePath`として生成します。通常場周本体へCircleや270を連結しないため、KMLでは各Placemarkを独立して表示できます。110 KTAS、Bank、Roll rateは曲線形状を構築する入力であり、出力はwindやtime-indexed aircraft dynamicsを含む`Trajectory`ではありません。
+
+## Identity、運用profile、airport loader
+
+Canonical identityは `ICAO + RWY + LEFT/RIGHT` です。`PatternLabel` と `TrafficPatternSpec.label` は削除しました。方位名は設定key・path名・filenameに使用しません。RJFMの移行は09 NORTH→LEFT、09 SOUTH→RIGHT、27 NORTH→RIGHT、27 SOUTH→LEFTです。Notebook/CLIは同じAPIを使用し、生成名のみこのidentityへ移行します。
+
+新しいprofileクラスは追加せず、既存の`TrafficPatternSpec`に`descent_start`、`preferred`、`notes`を追加しました。既存の`altitude_ft`、`downwind_offset_nm`、`crosswind_base_extension_nm`と合わせて、RWY×LEFT/RIGHT単位で指定できます。`source`はその運用profileの出典です。`preferred`と`notes`はmetadataのみで、反対側の生成を禁止しません。RJFMは既存の宮崎訓練飛行実施要領の北側通常使用に対応して、09 LEFTと27 RIGHTを`preferred=True`とします。
+
+```python
+from sr22_course_simulator.data.airports import load_airport
+from sr22_course_simulator.path import DescentStart, PatternSide, TrafficPatternSpec
+
+airport = load_airport("RJFT")
+# sourceには当該RWY/sideの運用値を裏付けるSourceCitationを渡す。
+# spec = TrafficPatternSpec(
+#     airport=airport, runway=airport.runway("07"), side=PatternSide.LEFT,
+#     altitude_ft=1400, downwind_offset_nm=1.5,
+#     crosswind_base_extension_nm=1.5, source=source,
+#     descent_start=DescentStart.BASE_TURN_END,
+# )
+```
+
+`load_airport(icao)`はbundled canonical JSONからRJFC/RJFG/RJFK/RJFM/RJFO/RJFS/RJFT/RJFUを読み込みます。AIP値をPythonへ再転記せず、`AirportSpec.source`はAD 2.2、各`RunwaySpec.source`はAD 2.12のdocument、section、effective date、page、PDF SHA-256を保持します。PDFファイル名の日付で節ごとの有効日を上書きしません。RJFMの数値は旧Python転記と同一ですが、runwayの出典有効日はcanonical記載の2025-05-15です。
+
+現行loaderのsource domainは各空港1本の物理滑走路と2方向です。未知空港、必須データ欠落、複数滑走路のpairing未定義は不足field/relationshipを示す`ValidationError`です。ARPやMagnetic Variationから不足値を補完しません。
 
 ## 幾何基準
 
@@ -72,7 +96,25 @@ Before Downwind／Before BaseのCircleは、270のON/OFFにかかわらず同じ
 
 単一の連続経路を返す`generate_traffic_pattern()`では、Circle ON／270 OFFの場合、360° Circleの終了点を通常90° turnの開始点へ合わせ、その後に通常turnを続けます。Roll遷移によるCircleの前進量も含めて終点合わせし、leg axisと接線を維持します。共有点は`before_*_turn_end`、通常turnの終了点は`downwind_turn_end`／`base_turn_end`です。独立component APIのCircleは引き続き潜在270の開始点に配置します。
 
-## 高度
+## 降下開始のsemantic
+
+`DescentStart`は次の3種類です。Circle/270のBooleanはprofileを変更しません。
+
+| 値 | 通常場周の降下開始 |
+| --- | --- |
+| `ABEAM_THRESHOLD` | Downwind axis上のlanding-threshold station (`abeam_threshold`) |
+| `BASE_TURN_START`（既定） | 通常90° Base turn開始 (`base_turn_start`) |
+| `BASE_TURN_END` | 通常90° Base turnの実際のrollout (`base_turn_end`) |
+
+`abeam_threshold`は既存の直線を分割するsemantic vertexで、通常場周の水平形状は変えません。単一経路APIではCircle/270内部の横切りをAbeamと取り違えません。要求したAbeamが直線Downwind上に存在しない組合せは、必要なstraight-Downwind/threshold-station relationshipを示すmodel gapになります。
+
+単一経路APIの`BASE_TURN_START`はPR #7の対応を維持します。270ありでは`before_base_turn_start`、Circle-onlyではCircle終了・通常90°開始の共有点`before_base_turn_end`、両方OFFでは`base_turn_start`です。`BASE_TURN_END`は270ありでは`before_base_turn_end`、それ以外はCircleの終了点ではなく通常90°の`base_turn_end`です。
+
+独立component APIでは常に同じ通常場周を第1 pathにします。追加Circleは従来どおり場周高度で独立表示する比較用pathであり、降下中の経路へ連結する飛行指令ではありません。Abeam指定のBefore Base 270は、既に降下している通常場周のbranch高度からmerge高度まで代替経路距離に比例して接続します。この追加距離に対する勾配は明示的な幾何近似です。通常場周のAbeam位置や高度は変えません。
+
+`BASE_TURN_END`のBefore Base 270は実際の270 rolloutまで場周高度を維持し、そこから降下します。そのrolloutは通常90°のBase終点より外側にあります。通常Base終点はまだ場周高度なので、そこへ高度まで再合流すると途中の降下を取り消す上昇が必要になります。そのため、このprofileの270 pathだけは既存のBase/Final形状をFinal rolloutまで含め、そこで通常場周に高度まで合流します。`before_base_merge`は水平合流点、`final_turn_end`は3D合流点です。この関係はcomponent citationにも保持します。Circle/270の旋回数学は変更しません。
+
+## 高度（既定のRJFM profile）
 
 - Aiming Markerの滑走路面MSL標高からUpwind turn開始点の1,000 ft MSLまで、Upwind距離に比例して上昇します。
 - Upwind turn開始から降下対象turnの開始までは1,000 ft MSLです。
@@ -118,10 +160,10 @@ PYTHONPATH=src python3 -m sr22_course_simulator.examples.miyazaki_traffic_patter
 
 ```text
 artifacts/traffic-patterns/
-├── RJFM_RWY09_NORTH_MAKE_CIRCLES.kml
-├── RJFM_RWY09_SOUTH_MAKE_CIRCLES.kml
-├── RJFM_RWY27_NORTH_MAKE_CIRCLES.kml
-├── RJFM_RWY27_SOUTH_MAKE_CIRCLES.kml
+├── RJFM_RWY09_LEFT_MAKE_CIRCLES.kml
+├── RJFM_RWY09_RIGHT_MAKE_CIRCLES.kml
+├── RJFM_RWY27_RIGHT_MAKE_CIRCLES.kml
+├── RJFM_RWY27_LEFT_MAKE_CIRCLES.kml
 ├── RJFM_ALL_MAKE_CIRCLE_PATTERNS.kml
 ├── RJFM_SHORT_DOWNWIND.kml
 ├── RJFM_SHORT_DOWNWIND_CIRCLE.kml
@@ -155,3 +197,9 @@ CLIでは対応する`--rwy09-line-color`、`--rwy09-fill-color`、`--rwy27-line
 `宮崎空港及びその周辺における訓練飛行実施要領（R6.5.1改正）` p.1は北側通常・南側許容、場周高度1,000 ft（MSLとは明記しない）、滑走路末端通過後かつ700 ft以上での旋回開始を記載します。`学訓 第4章 改正19` p.2図は場周高度を1,000 ft AGLとして図示し、p.1-2はTPAの300 ft手前からのCrosswind、上昇中20°、Level Off後/Downwind/Base 30°、Final標準25°（最大30°）、Downwind 1.5 NMと宮崎の1.2 NM騒音軽減指定を記載します。RWY27の指定地点通過後旋回も含め、これらはこのReferencePathでは再現しません。
 
 このモデルはtask指定に従って場周高度を1,000 ft MSLとして適用し、ユーザー選択により、1.2 NMを相反するCrosswind/Baseの共通axisとして扱い、Aiming MarkerからUpwind turn開始までに比例上昇します。110 KTAS、各Bank、10°/s Roll、3° Final、Aiming Marker規則、Before Downwind/BaseのMake Circle/Make 270有無はtask-provided入力です。旋回半径とRoll積分は`physics_derived`、組み立てたpath全体とShort Downwind Circleの配置は`assumption_dependent`です。Reference Data tableやwindをこの幾何の根拠として使用しません。
+
+## 数値回帰とsource整合確認
+
+PR #7を含むmain基準（`97a8ec5`）から、RJFMの4方向×32 Boolean設定について単一経路・全独立componentとShort Downwindを数値snapshot化しています。テストは追加したAbeam vertexを除いた全既存座標・MSL高度を比較します（緯度経度10桁、高度6桁へ丸めたdigest）。Abeamが従来のDownwind直線上にあることは別の数値テストで検証します。
+
+既存の球面近似による閾値方位との0.1°整合許容差は、canonical RJFC/RJFG/RJFK/RJFUの約0.11–0.13°、RJFOの約0.422°差を拒否していました。8空港を読み込むため、source sanity checkの許容差を0.5°としました。これはデータ補正ではありません。AIP True Bearing、両threshold、center pointは保持し、既存の中心・True Bearing・測定滑走路長から構成する幾何も維持します。公開方位と座標の差があるため、構成上のlanding-threshold pointはAIP閾値座標そのものと完全一致する保証はありません。長さ整合許容差15 mは従来どおりです。

@@ -23,7 +23,6 @@ from sr22_course_simulator.export import (
     write_kml,
 )
 from sr22_course_simulator.path import (
-    PatternLabel,
     PatternSide,
     PathPoint,
     PolylineReferencePath,
@@ -160,25 +159,23 @@ def rjfm_traffic_pattern_specs(
         TrafficPatternSpec(
             runway=runway_09,
             side=PatternSide.LEFT,
-            label=PatternLabel.NORTH,
+            preferred=True,
             **common,
         ),
         TrafficPatternSpec(
             runway=runway_09,
             side=PatternSide.RIGHT,
-            label=PatternLabel.SOUTH,
             **common,
         ),
         TrafficPatternSpec(
             runway=runway_27,
             side=PatternSide.RIGHT,
-            label=PatternLabel.NORTH,
+            preferred=True,
             **common,
         ),
         TrafficPatternSpec(
             runway=runway_27,
             side=PatternSide.LEFT,
-            label=PatternLabel.SOUTH,
             **common,
         ),
     )
@@ -189,7 +186,7 @@ def _rjfm_pattern_filename(spec: TrafficPatternSpec) -> str:
 
     return (
         f"RJFM_RWY{spec.runway.designation}_"
-        f"{spec.label.value.upper()}_MAKE_CIRCLES.kml"
+        f"{spec.side.value.upper()}_MAKE_CIRCLES.kml"
     )
 
 
@@ -452,7 +449,7 @@ def write_rjfm_traffic_pattern_kmls(
                 components,
                 name=(
                     f"{spec.airport.icao} RWY{spec.runway.designation} "
-                    f"{spec.label.value.upper()} Traffic Pattern Components"
+                    f"{spec.side.value.upper()} Traffic Pattern Components"
                 ),
                 styles=(styles_by_runway[spec.runway.designation],) * len(components),
             ),
