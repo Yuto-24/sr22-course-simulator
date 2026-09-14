@@ -34,7 +34,9 @@ def load_airport(icao: str) -> AirportSpec:
             f"{icao}: model gap: no bundled canonical AIP source"
         ) from exc
 
-    def citation(section: str) -> SourceCitation:
+    def citation(
+        section: str, *, transformations: tuple[str, ...] = ()
+    ) -> SourceCitation:
         document = record["source_document"]
         location = document["section_sources"][section]
         return SourceCitation(
@@ -43,9 +45,7 @@ def load_airport(icao: str) -> AirportSpec:
             section=f"{icao} {section.upper().replace('_', ' ', 1).replace('_', '.')}",
             page=location["aip_page"],
             extraction_method="supplied canonical AIP JSON transcription",
-            transformations=(
-                "reciprocal runway retains physical thresholds in reverse order",
-            ),
+            transformations=transformations,
             notes=(
                 f"source PDF page: {location['pdf_page']}",
                 f"source SHA-256: {document['sha256']}",
@@ -93,7 +93,12 @@ def load_airport(icao: str) -> AirportSpec:
                     threshold_elevation_b_ft=opposite["elevation_ft"],
                     declared_length_m=runway["dimensions"]["length_m"],
                     width_m=runway["dimensions"]["width_m"],
-                    source=citation("ad_2_12"),
+                    source=citation(
+                        "ad_2_12",
+                        transformations=(
+                            "reciprocal runway retains physical thresholds in reverse order",
+                        ),
+                    ),
                 )
             )
         variation = aerodrome["magnetic_variation"]
@@ -110,7 +115,9 @@ def load_airport(icao: str) -> AirportSpec:
             source=citation("ad_2_2"),
             runways=tuple(runways),
         )
-    except (KeyError, TypeError) as exc:
+    except ValidationError:
+        raise
+    except (KeyError, TypeError, ValueError) as exc:
         raise ValidationError(
             f"{icao}: model gap: missing/invalid canonical airport source field: {exc}"
         ) from exc

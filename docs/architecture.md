@@ -476,7 +476,7 @@ environment    atmosphere, terrain and polymorphic wind providers
 performance    canonical tables, loader, interpolation, POH cruise query
 maneuver       source-semantic ManeuverSpec and separate AdvisoryReference
 airport        AirportSpec / RunwaySpec, DMS parsing and RWY Center Point
-data/airports  canonical RJFM AIP and task-provided Short Downwind transcription
+data/airports  eight canonical AIP JSON records (RJFC/RJFG/RJFK/RJFM/RJFO/RJFS/RJFT/RJFU), shared loader, and task-provided Short Downwind transcription
 path           wind-independent pylon, polyline, traffic-pattern and Short Downwind geometry
 guidance       wind triangle and bounded Spiral Descent guidance
 simulation     analytical mechanics, termination, forward integrator, Trajectory

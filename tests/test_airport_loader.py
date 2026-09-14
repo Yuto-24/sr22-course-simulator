@@ -107,6 +107,52 @@ class AirportLoaderTests(unittest.TestCase):
         self.assertEqual(RJFM.source.effective_date, "2026-03-01")
         self.assertEqual(RJFM.runway("09").source.effective_date, "2025-05-15")
 
+    def test_runway_transformations_are_not_attached_to_aerodrome_sources(self):
+        for icao in AIRPORTS:
+            with self.subTest(icao=icao):
+                airport = load_airport(icao)
+                self.assertEqual(airport.source.transformations, ())
+                for runway in airport.runways:
+                    self.assertEqual(
+                        runway.source.transformations,
+                        (
+                            "reciprocal runway retains physical thresholds in reverse order",
+                        ),
+                    )
+
+    def test_invalid_coordinate_value_reports_contextual_model_gap(self):
+        for field in ("latitude_deg", "longitude_deg"):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as directory:
+                data = json.loads(CANONICAL.joinpath("RJFM.json").read_text())
+                data["runways"]["09"]["threshold"][field] = "not-a-coordinate"
+                root = Path(directory)
+                (root / "canonical").mkdir()
+                (root / "canonical/RJFM.json").write_text(json.dumps(data))
+                with (
+                    patch(
+                        "sr22_course_simulator.data.airports.loader.files",
+                        return_value=root,
+                    ),
+                    self.assertRaisesRegex(
+                        ValidationError, "RJFM.*model gap.*not-a-coordinate"
+                    ) as caught,
+                ):
+                    load_airport("RJFM")
+                self.assertIs(type(caught.exception.__cause__), ValueError)
+
+    def test_existing_domain_validation_error_is_preserved(self):
+        error = ValidationError("specific source geometry constraint")
+        with (
+            patch(
+                "sr22_course_simulator.data.airports.loader.RunwaySpec",
+                side_effect=error,
+            ),
+            self.assertRaises(ValidationError) as caught,
+        ):
+            load_airport("RJFM")
+        self.assertIs(caught.exception, error)
+        self.assertIsNone(caught.exception.__cause__)
+
     def test_rjfm_numeric_parity_with_original_python_transcription(self):
         # These are the pre-loader rjfm.py source values, not generated geometry.
         self.assertEqual(RJFM.reference_point.latitude_deg, parse_aip_dms("315238N"))
