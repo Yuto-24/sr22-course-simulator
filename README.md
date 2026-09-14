@@ -56,6 +56,7 @@ Notebook の編集内容は `notebooks/spiral_descent_walkthrough.ipynb` に保�
 | POH の canonical data を追加する | `src/sr22_course_simulator/data/poh/canonical/` | node 再現・範囲外拒否 test を追加 |
 | 数値の時系列を確認する | `artifacts/guided-trajectory.csv` | 単位は列名に明記 |
 | 3D 経路を確認する | `artifacts/*.kml` | Reference Path と Trajectory は別ファイル |
+| RJF* 7空港・28場周を生成する | `sr22-rjf-patterns`（[共通CLI](docs/traffic-patterns.md#共通cli--kml)） | `artifacts/rjf-traffic-patterns/*.kml` |
 | RJFM 場周経路を生成する | `notebooks/miyazaki_traffic_patterns.ipynb` | `artifacts/traffic-patterns/*.kml` |
 
 ## 目的
