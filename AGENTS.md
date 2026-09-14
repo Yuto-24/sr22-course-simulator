@@ -119,7 +119,7 @@ For supported POH Chapter 5 data:
 
 A smooth interpolation surface does not prove support for every arbitrary `Pitch × Bank × PWR × Flap` transient state.
 
-If a requested operating point cannot be justified by approved performance data, procedure narrative, analytical physics, or an explicitly documented assumption/calibration, return or raise an explicit unsupported/model-gap result. Do not manufacture plausible-looking behavior to hide the gap.
+If a requested operating point cannot be justified by approved performance data, procedure narrative, analytical physics, or an explicitly documented assumption/calibration, return or raise an explicit unsupported/model-gap result. Document the missing relationship or source-domain condition that prevents support so the gap is actionable. Do not manufacture plausible-looking behavior to hide the gap.
 
 ## 6. ReferencePath, airport geometry, and NAV conventions
 
