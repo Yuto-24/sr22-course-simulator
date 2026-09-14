@@ -71,6 +71,7 @@ def _append_line_placemark(
     coordinates: tuple[tuple[float, float, float], ...],
     style_url: str | None = None,
     extrude: bool = False,
+    description: str | None = None,
 ) -> None:
     """Append one absolute-altitude LineString placemark."""
 
@@ -78,6 +79,8 @@ def _append_line_placemark(
         raise ValueError("KML LineString requires at least two coordinates")
     placemark = ET.SubElement(document, _tag("Placemark"))
     ET.SubElement(placemark, _tag("name")).text = name
+    if description is not None:
+        ET.SubElement(placemark, _tag("description")).text = description
     if style_url is not None:
         ET.SubElement(placemark, _tag("styleUrl")).text = style_url
     line = ET.SubElement(placemark, _tag("LineString"))
@@ -97,6 +100,7 @@ def _document(
     *,
     style: KmlPathStyle | None = None,
     styles: tuple[KmlPathStyle | None, ...] | None = None,
+    descriptions: tuple[str | None, ...] | None = None,
 ) -> str:
     """Create a KML document containing one or more LineStrings."""
 
@@ -106,6 +110,8 @@ def _document(
         raise ValueError("style and styles are mutually exclusive")
     if styles is not None and len(styles) != len(placemarks):
         raise ValueError("styles must contain one entry per placemark")
+    if descriptions is not None and len(descriptions) != len(placemarks):
+        raise ValueError("descriptions must contain one entry per placemark")
     root = ET.Element(_tag("kml"))
     document = ET.SubElement(root, _tag("Document"))
     ET.SubElement(document, _tag("name")).text = name
@@ -130,15 +136,17 @@ def _document(
         ET.SubElement(poly_style, _tag("outline")).text = (
             "1" if placemark_style.outline else "0"
         )
-    for (placemark_name, coordinates), placemark_style in zip(
+    for (placemark_name, coordinates), placemark_style, description in zip(
         placemarks,
         placemark_styles,
+        descriptions if descriptions is not None else (None,) * len(placemarks),
         strict=True,
     ):
         _append_line_placemark(
             document,
             name=placemark_name,
             coordinates=coordinates,
+            description=description,
             style_url=(
                 style_urls[placemark_style]
                 if placemark_style is not None
@@ -203,12 +211,14 @@ def reference_paths_to_kml(
     name: str = "Reference Paths",
     style: KmlPathStyle | None = None,
     styles: Iterable[KmlPathStyle | None] | None = None,
+    descriptions: Iterable[str | None] | None = None,
 ) -> str:
     """Convert multiple reference paths to one multi-Placemark KML document.
 
     ``style`` applies one style to every path. ``styles`` instead supplies one
     style per path, which allows a combined document to retain distinctions
-    such as runway-specific colors.
+    such as runway-specific colors. ``descriptions`` supplies optional text
+    (for example source metadata) per path; XML escaping is automatic.
     """
 
     paths = tuple(reference_paths)
@@ -227,7 +237,13 @@ def reference_paths_to_kml(
         for path in paths
     )
     per_path_styles = tuple(styles) if styles is not None else None
-    return _document(name, placemarks, style=style, styles=per_path_styles)
+    return _document(
+        name,
+        placemarks,
+        style=style,
+        styles=per_path_styles,
+        descriptions=tuple(descriptions) if descriptions is not None else None,
+    )
 
 
 def write_kml(content: str, destination: str | Path) -> Path:

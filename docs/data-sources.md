@@ -468,3 +468,26 @@ applicability: aircraft/configuration/conditions
 ```
 
 It rejects duplicate JSON keys, unknown fields, sparse/ragged grids, non-finite values, duplicate/descending axes and shape mismatch. Query coordinates must match the axis set exactly. Source endpoints are inclusive; any request outside the source domain raises structured `OutOfDomainError`. There is deliberately no extrapolation switch.
+
+## 16. RJF operational profiles (Issue #9)
+
+`data/airports/traffic_profiles.py` holds only the seven-airport operational
+matrix supplied in [Issue #9](https://github.com/Yuto-24/sr22-course-simulator/issues/9).
+It does not duplicate AIP thresholds, bearings, elevations, or magnetic data.
+`load_airport` remains the geometry source, including full canonical citations.
+
+The supplied operational transcription cites the Saga agreement dated
+2026-04-01 and 学生訓練実施要領 改正19. The original operational PDFs were not
+independently re-transcribed for this addition. Unknown page numbers are not
+invented. Local explicit altitudes are labeled separately from the Issue's
+nearest-100-ft rule applied to canonical field elevation + 1000 ft; the generic
+rule cites Chapter 4 normal Departure and Chapter 3's Kushiro briefing example.
+RJFT's south-side 1700 ft is an explicit local override of the 1400 ft AIP
+single-engine nominal supplied in the Issue. These are operational targets,
+not aircraft performance data or chapter-end Reference Data.
+
+All dimensions and turn settings remain task-selected geometry assumptions.
+Source cautions and preferred side never filter the four patterns. Exported
+KML descriptions retain the operational citation and the complete loaded
+airport/runway citations separately. The profile matrix, rule derivation, and
+altitude-model limitations are documented in `traffic-patterns.md`.

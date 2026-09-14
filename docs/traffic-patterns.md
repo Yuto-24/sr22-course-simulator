@@ -203,3 +203,81 @@ CLIでは対応する`--rwy09-line-color`、`--rwy09-fill-color`、`--rwy27-line
 PR #7を含むmain基準（`97a8ec5`）から、RJFMの4方向×32 Boolean設定について単一経路・全独立componentとShort Downwindを数値snapshot化しています。テストは追加したAbeam vertexを除いた全既存座標・MSL高度を比較します（緯度経度10桁、高度6桁へ丸めたdigest）。Abeamが従来のDownwind直線上にあることは別の数値テストで検証します。
 
 既存の球面近似による閾値方位との0.1°整合許容差は、canonical RJFC/RJFG/RJFK/RJFUの約0.11–0.13°、RJFOの約0.422°差を拒否していました。8空港を読み込むため、source sanity checkの許容差を0.5°としました。これはデータ補正ではありません。AIP True Bearing、両threshold、center pointは保持し、既存の中心・True Bearing・測定滑走路長から構成する幾何も維持します。公開方位と座標の差があるため、構成上のlanding-threshold pointはAIP閾値座標そのものと完全一致する保証はありません。長さ整合許容差15 mは従来どおりです。
+
+## RJF* 7空港の共通builder（Issue #9）
+
+`data.airports.traffic_profiles.rjf_traffic_pattern_specs(icao)`は、canonical
+JSONを共通loaderで読み込み、以下の運用表から4本の`TrafficPatternSpec`を返します。
+`examples.rjf_traffic_patterns.build_rjf_traffic_patterns(icao, **switches)`は、
+各specと通常場周・選択した独立componentの組を返します。既存geometry engineを
+共有し、空港ごとのgeneratorやNotebookは追加しません。
+
+| ICAO | RWY × side | 高度 ft MSL | 降下開始 | Preferred | 高度根拠 |
+| --- | --- | ---: | --- | --- | --- |
+| RJFS | 11 LEFT / 29 RIGHT | 1000 | Base Turn start | no | local explicit |
+| RJFS | 11 RIGHT / 29 LEFT | 1000 | Base Turn start | yes（南） | local explicit |
+| RJFO | 01 LEFT / 19 RIGHT | 1300 | Abeam Threshold | no | local explicit（西） |
+| RJFO | 01 RIGHT / 19 LEFT | 1000 | Base Turn start | yes（東・海） | generic: 17 + 1000 → 1000 |
+| RJFK | 16・34 × LEFT/RIGHT | 1900 | Base Turn start | no | generic: 891 + 1000 → 1900 |
+| RJFT | 07 LEFT / 25 RIGHT | 1400 | Base Turn end | no | local explicit（北） |
+| RJFT | 07 RIGHT / 25 LEFT | 1700 | Base Turn start | no | local explicit（南override） |
+| RJFG | 13 LEFT / 31 RIGHT | 1800 | Base Turn start | yes（北） | local explicit |
+| RJFG | 13 RIGHT / 31 LEFT | 1800 | Base Turn start | no | local explicit |
+| RJFU | 14・32 × LEFT/RIGHT | 1000 | Base Turn start | no | generic: 8 + 1000 → 1000 |
+| RJFC | 14・32 × LEFT/RIGHT | 1100 | Base Turn start | no | generic: 122 + 1000 → 1100 |
+
+7空港ともDownwind offsetとCrosswind/Base extensionは1.5 NM / 1.5 NMです。
+RJFMの1.5 / 1.2 NMは変更しません。共通値は110 KTAS、Upwind→Crosswind
+30°、ordinary Downwind/BaseとCircle/270 22°、Final turn 25°、Roll 10°/s、
+Final glide 3°です。Preferredはmetadataであり、常に両滑走路×両側を生成します。
+
+運用値の直接の転記元は[Issue #9](https://github.com/Yuto-24/sr22-course-simulator/issues/9)
+で提供された航大資料の記述です。佐賀は
+`航空大学校所属航空機の他空港利用に関する調整事項[2026.4.1].pdf`、
+他のlocal値・注意事項は`学生訓練実施要領 改正19`の空港情報に基づきます。
+元の運用PDFを今回あらためて転記・照合したものではなく、不明なページを補いません。
+熊本北側1400 ftはIssueにあるAIP AD2.23のsingle-engine nominalとも整合し、
+南側1700 ftは航大local運用の明示overrideとして記録します。
+
+Generic ruleは同要領第4章通常DepartureのAGL+1000 ftと、第3章Approach
+briefingの釧路311 ft→1300 ft例を根拠とするIssue指定の丸めです。
+`floor((field_elevation_ft + 1000 + 50) / 100) * 100`を適用し、50 ft境界で
+banker's roundingを使いません。標高は実行時にcanonical airport JSONから取得します。
+`spec.notes`と`spec.source.notes`で`local_explicit` / `generic_field_plus_1000`を
+区別します。種子島1800 ftはlocal記述の明示値として保持します。
+
+大分西側の810 ft terrain、鹿児島のterrain/traffic、長崎のentry注意事項は
+metadataとして保持し、形状の除外・変形やterrain clearanceの保証にしません。
+屋久島のIFR Circling EAST onlyをVFR側の制約に流用しません。長崎の海上飛行という
+事情だけからpreferredを推定しません。未登録空港には、足りない運用profileの
+高度・降下・preferred根拠を明記したmodel-gapエラーを返します。
+
+このReferencePathの高度は既存の区間補間を使い、指定降下開始点から3° Finalへ
+連続接続します。Abeamから接地まで全区間を厳密な3°とするflight guidanceでは
+ありません。CircleはTPAでの独立比較経路です。Before Base 270の降下・合流の
+扱いも上記共通仕様を使います。風・動力学・地形回避の追加モデルはありません。
+
+### 共通CLI / KML
+
+```bash
+# 全7空港: 個別28 + 空港別combined 7 = 35ファイル
+PYTHONPATH=src python3 -m sr22_course_simulator.examples.rjf_traffic_patterns \
+  --output-dir artifacts/rjf-traffic-patterns
+
+# installed entry point、空港指定、各Booleanを独立に指定
+sr22-rjf-patterns --airport RJFO --make-circle-before-base --no-make-270-before-base
+```
+
+5個の`--make-*` / `--no-make-*`はRJFM CLIと同じ名称と初期値を使います。
+Before Base Circleのみ既定OFF、他4個はONです。全OFFなら通常場周のみを生成します。
+各空港は`ICAO_RWYxx_LEFT_TRAFFIC_PATTERN.kml`、
+`ICAO_RWYxx_RIGHT_TRAFFIC_PATTERN.kml`を両滑走路分と、
+`ICAO_ALL_TRAFFIC_PATTERNS.kml`を出力します。Placemark名も同じcanonical identity
+で始まり、通常本体と各Circle/270を分離します。KML座標はlongitude・latitude・
+MSL altitude[m]順、`altitudeMode=absolute`です。各Placemarkのdescriptionには
+JSONでpreferred、高度、降下開始、注意事項、運用出典、canonical airport/runway
+の全`SourceCitation`（effective date・section・source hashを含むnotes）を保持します。
+
+`tests/test_rjf_traffic_patterns.py`は28場周×32設定、相反滑走路のphysical side、
+1.5 NMの各axis、Abeam、降下開始と3° Final、35 KMLの全座標とmetadataを検証します。
+既存RJFMの座標snapshot・Short Downwind・CLIテストも継続します。

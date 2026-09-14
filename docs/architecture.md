@@ -530,3 +530,11 @@ preferred metadata and notes are per pattern. No registry or airport-specific
 copy of the geometry engine is required. The existing independent component
 builder remains the KML-facing API. See `traffic-patterns.md` for the different
 horizontal/vertical rejoin points of a Base-turn-end 270 alternative.
+
+For the seven Issue #9 airports, `data.airports.traffic_profiles` resolves the
+operational table into existing `TrafficPatternSpec` objects; generic altitude
+uses the loaded airport field elevation. `examples.rjf_traffic_patterns` pairs
+each spec with the existing engine's independent components and writes four
+individual plus one combined KML per airport. KML's optional per-path description
+carries preferred and source metadata. RJFM keeps its existing builder, CLI,
+Notebook and Short Downwind API; both builders share the same geometry engine.
