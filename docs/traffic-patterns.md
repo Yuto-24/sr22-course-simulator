@@ -231,6 +231,8 @@ RJFMの1.5 / 1.2 NMは変更しません。共通値は110 KTAS、Upwind→Cross
 30°、ordinary Downwind/BaseとCircle/270 22°、Final turn 25°、Roll 10°/s、
 Final glide 3°です。Preferredはmetadataであり、常に両滑走路×両側を生成します。
 
+情報基準時点は[Source snapshotの定義](data-sources.md#information-baseline)を参照してください。
+
 運用値の直接の転記元は[Issue #9](https://github.com/Yuto-24/sr22-course-simulator/issues/9)
 で提供された航大資料の記述です。佐賀は
 `航空大学校所属航空機の他空港利用に関する調整事項[2026.4.1].pdf`、
