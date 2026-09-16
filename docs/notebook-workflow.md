@@ -89,6 +89,7 @@ Docker container 内の `/workspace/notebooks` はホストの `notebooks/`、`/
 | --- | --- | --- |
 | `notebooks/spiral_descent_walkthrough.ipynb` | 入力セル、説明、保存したセル出力 | 対象 |
 | `notebooks/miyazaki_traffic_patterns.ipynb` | RJFM master data、4 pattern、KML 出力 | 対象 |
+| `notebooks/kyushu_traffic_patterns.ipynb` | 九州8空港の選択、4場周と独立Circle / 270、可視化、KML / KMZ 出力 | 対象 |
 | `artifacts/guided-trajectory.csv` | 1 state 1 row の時系列、単位付き列、evidence | 対象外 |
 | `artifacts/guided-trajectory.kml` | 風の影響を受けた Trajectory | 対象外 |
 | `artifacts/guided-reference-path.kml` | 風と独立した Reference Path | 対象外 |
@@ -96,8 +97,11 @@ Docker container 内の `/workspace/notebooks` はホストの `notebooks/`、`/
 | `artifacts/guided-altitude-time.png` | 高度 MSL の時系列 | 対象外 |
 | `artifacts/guided-trajectory-3d.png` | 3 次元比較 | 対象外 |
 | `artifacts/traffic-patterns/*.kml` | RJFM の個別4 path と結合 KML | 対象外 |
+| `artifacts/kyushu-traffic-patterns/*.kml` | 各空港の4場周の個別raw KMLと結合raw KML | 対象外 |
+| `artifacts/kyushu-traffic-patterns/<ICAO>_TRAFFIC_PATTERNS.kmz` | 空港別の4場周と選択した独立componentを収録したKMZ | 対象外 |
+| `artifacts/kyushu-traffic-patterns/KYUSHU_TRAFFIC_PATTERNS.kmz` | RJFMを含む九州8空港をまとめたKMZ（全空港出力時） | 対象外 |
 
-Notebook のセル出力を `.ipynb` に残す場合は、JupyterLab の `File > Save Notebook` を実行します。CSV / KML / PNG は各セルの実行時に上書きされます。
+Notebook のセル出力を `.ipynb` に残す場合は、JupyterLab の `File > Save Notebook` を実行します。CSV / KML / KMZ / PNG は各セルの実行時に上書きされます。
 
 CSV の aviation-facing 列と SI 列は列名で区別します。例: `altitude_m` / `altitude_ft`、`true_airspeed_mps` / `true_airspeed_kt`、`vertical_speed_mps` / `vertical_speed_fpm`。内部計算は SI 単位です。
 
