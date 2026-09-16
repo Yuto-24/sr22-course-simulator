@@ -283,3 +283,17 @@ JSONでpreferred、高度、降下開始、注意事項、運用出典、canonic
 `tests/test_rjf_traffic_patterns.py`は28場周×32設定、相反滑走路のphysical side、
 1.5 NMの各axis、Abeam、降下開始と3° Final、35 KMLの全座標とmetadataを検証します。
 既存RJFMの座標snapshot・Short Downwind・CLIテストも継続します。
+
+## 九州共通Notebook / KMZ
+
+`notebooks/kyushu_traffic_patterns.ipynb` はRJFMと上記7空港の既存profileを選択し、同じcomponent builderで生成します。RJFMの1.2 NM Crosswind/Base axisと他7空港の1.5 NM axisなど、各profileの設定を維持します。高度・降下開始点・preferredはprofile由来であり、Notebookへ再転記しません。
+
+出力は各空港の4個別raw KML、結合raw KML、`<ICAO>_TRAFFIC_PATTERNS.kmz` です。全空港出力ではさらに `KYUSHU_TRAFFIC_PATTERNS.kmz` を生成します。KMZの `doc.kml` は空港 → RWY → LEFT/RIGHT のFolderに独立componentのPlacemarkを収録します。既存exporterの座標・absolute MSL高度・style・出典metadataを保持し、[source snapshot](data-sources.md#information-baseline)をsource固有の発効日とは別に記録します。RJFM固有のShort Downwindは既存Notebookと既存KML出力に残します。
+
+同じ出力をbatchで生成する場合:
+
+```bash
+python3 -m sr22_course_simulator.examples.kyushu_traffic_patterns --output-dir artifacts/kyushu-traffic-patterns
+```
+
+`--airport RJFM` で単一空港を選択できます。既存のRJFM / RJF CLIとraw KML出力も引き続き使用できます。
