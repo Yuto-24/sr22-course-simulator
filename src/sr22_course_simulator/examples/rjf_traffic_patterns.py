@@ -49,7 +49,9 @@ def build_rjf_traffic_patterns(
     return tuple(pairs)
 
 
-def _description(spec: TrafficPatternSpec) -> str:
+def pattern_description(spec: TrafficPatternSpec) -> str:
+    """Serialize one traffic-pattern's semantic and source metadata."""
+
     return json.dumps(
         {
             "identity": pattern_identity(spec),
@@ -78,7 +80,7 @@ def write_rjf_traffic_pattern_kmls(
     all_paths = []
     all_descriptions = []
     for spec, components in pairs:
-        descriptions = (_description(spec),) * len(components)
+        descriptions = (pattern_description(spec),) * len(components)
         written.append(
             write_kml(
                 reference_paths_to_kml(

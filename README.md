@@ -6,6 +6,10 @@ Cirrus SR22 を対象に、航空大学校の訓練で扱う飛行経路・飛�
 
 ## まず Notebook で動かす
 
+Jupyter / Notebookを主たるinteractive workflowとし、条件変更・可視化・exportまでNotebookから行います。CLIはbatch / automation / validation向けの補助interfaceです。CLIだけ実装してNotebookから利用できない状態を通常の完成形とはしません。
+
+九州8空港の通常Traffic Patternには [`kyushu_traffic_patterns.ipynb`](notebooks/kyushu_traffic_patterns.ipynb) を使います。parameter cellでRJFM / RJFS / RJFO / RJFK / RJFT / RJFG / RJFU / RJFCを選び、4場周の高度・降下開始・preferred metadata、5つの独立Circle / 270、平面図・高度profileを確認してKML / KMZを出力します。`EXPORT_ALL_AIRPORTS=True` で8空港の個別KMZと `KYUSHU_TRAFFIC_PATTERNS.kmz` をまとめて生成できます。
+
 Docker が使える Linux では、repository root で次を実行します。
 
 ```bash
@@ -56,8 +60,8 @@ Notebook の編集内容は `notebooks/spiral_descent_walkthrough.ipynb` に保�
 | POH の canonical data を追加する | `src/sr22_course_simulator/data/poh/canonical/` | node 再現・範囲外拒否 test を追加 |
 | 数値の時系列を確認する | `artifacts/guided-trajectory.csv` | 単位は列名に明記 |
 | 3D 経路を確認する | `artifacts/*.kml` | Reference Path と Trajectory は別ファイル |
-| RJF* 7空港・28場周を生成する | `sr22-rjf-patterns`（[共通CLI](docs/traffic-patterns.md#共通cli--kml)） | `artifacts/rjf-traffic-patterns/*.kml` |
-| RJFM 場周経路を生成する | `notebooks/miyazaki_traffic_patterns.ipynb` | `artifacts/traffic-patterns/*.kml` |
+| 九州8空港・32場周を確認・出力する | `notebooks/kyushu_traffic_patterns.ipynb` | `artifacts/kyushu-traffic-patterns/*.kml`, `*.kmz` |
+| RJFM Short Downwind等を確認する | `notebooks/miyazaki_traffic_patterns.ipynb` | `artifacts/traffic-patterns/*.kml` |
 
 ## 目的
 
