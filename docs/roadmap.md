@@ -2,9 +2,23 @@
 
 ## Near-term priorities
 
+### Current execution order (2026-09-25)
+
+Traffic-pattern generalization is complete through Issues #8, #9 and #13 (merged by PR #14). Before this roadmap sync, there were no open implementation Issues.
+
+Next execution order:
+
+1. #15 — reusable NAV leg / wind-triangle solver.
+2. #16 — Cut Angle / intercept solver and Jupyter workflow; depends on #15.
+3. #17 — wind-corrected guidance targets for existing ReferencePath geometry; depends on #15 and may proceed in parallel with #16 after #15.
+4. Expand source-backed aircraft-performance coverage when the required POH relationship/data is available.
+5. Add flight-data comparison after the guidance/trajectory interfaces are stable enough to compare without introducing one-off adapters.
+
+NAV is the immediate priority because it reuses the already-validated geometry and wind conventions and is not blocked by the unresolved longitudinal `Pitch/PWR/state -> TAS/flight-path-angle` relationship.
+
 ### Initial implementation status
 
-Completed in the first package version:
+Implemented baseline:
 
 - common SI units, Initial/Aircraft state, Pitch/Bank/PWR/Flap input, wind, terrain, fuel and weight conventions;
 - narrative-semantic `ManeuverSpec` and separately typed `AdvisoryReference`;
@@ -19,7 +33,9 @@ Completed in the first package version:
   threshold-derived RWY Center Point;
 - RJFM RWY09/RWY27 LEFT/RIGHT Make-Circle Reference Paths, Notebook and
   individual/combined Google Earth altitude KML export;
-- deterministic numerical/source-semantic tests.
+- generalized RJFM + seven additional RJF* airports into 32 LEFT/RIGHT Traffic Patterns with per-profile altitude/descent/provenance;
+- Jupyter-first Kyushu Traffic Pattern workflow with per-airport KML/KMZ and aggregate `KYUSHU_TRAFFIC_PATTERNS.kmz`;
+- deterministic numerical/source-semantic tests, including Notebook/KMZ contract coverage.
 
 Still open before claiming source-backed SR22 Spiral Descent performance:
 
@@ -199,30 +215,40 @@ Do not add a maneuver merely by copying its Reference Data row.
 - [x] add verbatim task-provided RJFM Short Downwind and RWY27 Entry geometry plus a tangent 110 KTAS / 22-degree Circle;
 - [x] load and validate canonical AIP geometry for RJFM and the seven other target airports (RJFO, RJFK, RJFT, RJFS, RJFU, RJFG, RJFC);
 - [x] support per-runway LEFT/RIGHT profiles and Abeam / Base-turn-start / Base-turn-end descent semantics;
-- [ ] add the seven other airports' operational profiles and individual/combined KML generation (Issue #9);
-- generate wind-corrected guidance required to maintain the same ground path;
+- [x] add the seven other airports' operational profiles and individual/combined KML generation (Issue #9);
+- [x] add a Jupyter-first RJFM + seven-airport workflow and per-airport / aggregate KMZ export (Issue #13 / PR #14);
+- [ ] generate wind-corrected guidance targets for the same wind-independent ground path (Issue #17);
 - support airport-specific procedures as data rather than hard-coded special cases where practical;
 - keep path geometry separate from aircraft trajectory.
 
 ### NAV solver
 
-#### Calm-wind NAV
+#### Core leg / wind-triangle solver — Issue #15
 
-- leg geometry;
-- course/track relationship;
-- turn/intercept geometry;
-- Cut Angle flight time.
+- straight-leg geometry;
+- True Course / Track;
+- TAS + wind -> WCA / required True Heading / GS;
+- ETE;
+- explicit rejection when the requested ground track is not flyable at the supplied TAS/wind.
 
-#### Forecast-wind NAV
+#### Cut Angle / intercept — Issue #16
 
-- WCA;
-- required heading;
-- GS;
-- wind-corrected Cut Angle / intercept;
-- intercept time;
-- gain/loss time where required.
+- Cut Angle defined against desired ground track / reference course;
+- intercept geometry and intercept point;
+- wind-corrected Heading / GS via #15;
+- cut distance and flight time;
+- gain/loss time only when the comparison baseline is explicit;
+- Jupyter-first interactive workflow and visualization.
 
-Use the same vector/wind conventions as the trajectory simulator.
+#### ReferencePath wind guidance — Issue #17
+
+- local desired Track from existing ReferencePath geometry;
+- WCA / required Heading / GS via #15;
+- support current polyline, circular/pylon and traffic-pattern path forms;
+- preserve ReferencePath coordinates unchanged by wind;
+- keep guidance targets separate from full closed-loop Trajectory tracking.
+
+Use the same vector/wind conventions as the trajectory simulator. After #15, #16 and #17 are intentionally independent enough to proceed in parallel.
 
 ### Weather integration
 
